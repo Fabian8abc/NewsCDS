@@ -31,7 +31,7 @@
             flex: 1;
             height: 100%; 
             position: relative;
-            z-index: 1; /* El mapa siempre en su propia capa */
+            z-index: 1;
         }
 
         #map {
@@ -40,7 +40,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: transparent !important; /* Evita que el fondo gris tape el render */
+            background-color: #e5e3df; /* Color base */
             z-index: 2;
         }
 
@@ -57,7 +57,6 @@
         .split-view #news-panel { width: 40%; padding: 20px; }
         .split-view #map-wrapper { flex: 0 0 60%; }
 
-        /* Botón de pánico/monitoreo */
         .btn-toggle {
             position: absolute;
             top: 20px;
@@ -69,12 +68,11 @@
             border-radius: 50px;
             font-weight: bold;
             cursor: pointer;
-            z-index: 100; /* Siempre visible por encima de todo */
+            z-index: 100;
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
             border: none;
         }
 
-        /* Estilos de noticias cronológicas */
         .news-card {
             background: white;
             border-radius: 8px;
@@ -84,8 +82,8 @@
             border-left: 5px solid var(--accent);
         }
 
-        .news-card h3 { margin: 0 0 8px 0; font-size: 15px; line-height: 1.4; }
-        .news-date { font-size: 11px; color: #7f8c8d; font-weight: bold; }
+        .news-card h3 { margin: 0 0 8px 0; font-size: 15px; line-height: 1.4; color: #333; }
+        .news-date { font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 5px; }
         .news-link { color: var(--primary); font-size: 12px; text-decoration: none; font-weight: bold; }
     </style>
 </head>
@@ -98,9 +96,9 @@
     </div>
     
     <div id="news-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2>Eventos Recientes</h2>
-            <button onclick="toggleDashboard()" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+            <h2 style="margin:0; font-size: 1.5rem;">Eventos Recientes</h2>
+            <button onclick="toggleDashboard()" style="border:none; background:none; font-size:28px; cursor:pointer; color:#888;">&times;</button>
         </div>
         <div id="news-content"></div>
     </div>
@@ -111,22 +109,21 @@
     let isDashboardOpen = false;
     const gdlCenter = { lat: 20.6596, lng: -103.3496 };
 
-    // Inicialización forzada
     function initMap() {
+        console.log("Google Maps Initialized Successfully");
         try {
             map = new google.maps.Map(document.getElementById("map"), {
                 zoom: 7,
                 center: gdlCenter,
-                disableDefaultUI: false,
+                mapTypeControl: false,
+                streetViewControl: false,
                 gestureHandling: "greedy"
             });
 
             const trafficLayer = new google.maps.TrafficLayer();
             trafficLayer.setMap(map);
-            
-            console.log("Google Maps Initialized Successfully");
         } catch (e) {
-            console.error("Error al inicializar el mapa:", e);
+            console.error("Error en la inicialización de Maps:", e);
         }
     }
 
@@ -141,9 +138,8 @@
             container.classList.remove('split-view');
         }
 
-        // Forzamos el redibujado para evitar el lienzo gris
         setTimeout(() => {
-            if (map) {
+            if (map && typeof google !== 'undefined') {
                 google.maps.event.trigger(map, 'resize');
                 map.setCenter(gdlCenter);
             }
@@ -152,10 +148,11 @@
 
     async function fetchNews() {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = '<p>Buscando disrupciones en tiempo real...</p>';
+        contentDiv.innerHTML = '<p>Buscando disrupciones viales...</p>';
 
-        const keywords = "bloqueos OR huelgas OR manifestaciones OR inundaciones OR lluvias OR 'cadena de suministro' OR trafico";
-        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(keywords)}+mexico&hl=es-419&gl=MX&ceid=MX:es-419`;
+        // Búsqueda simplificada para evitar Error 500
+        const query = encodeURIComponent("bloqueos carreteras Mexico OR inundaciones OR huelga transporte");
+        const rssUrl = `https://news.google.com/rss/search?q=${query}&hl=es-419&gl=MX&ceid=MX:es-419`;
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 
         try {
@@ -166,21 +163,29 @@
                 // Ordenar por fecha: Más reciente primero
                 const sortedItems = data.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 
-                contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => `
-                    <div class="news-card">
-                        <div class="news-date">${new Date(item.pubDate).toLocaleString()}</div>
-                        <h3>${item.title}</h3>
-                        <a class="news-link" href="${item.link}" target="_blank">VER DETALLES ➜</a>
-                    </div>
-                `).join('');
+                contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => {
+                    const dateStr = new Date(item.pubDate).toLocaleString('es-MX', {
+                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                    });
+                    return `
+                        <div class="news-card">
+                            <div class="news-date">${dateStr}</div>
+                            <h3>${item.title}</h3>
+                            <a class="news-link" href="${item.link}" target="_blank">VER DETALLES ➜</a>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                contentDiv.innerHTML = "<p>No se encontraron noticias recientes.</p>";
             }
         } catch (err) {
-            contentDiv.innerHTML = "<p>Error al obtener noticias.</p>";
+            console.error("Error Fetching News:", err);
+            contentDiv.innerHTML = "<p>Error al obtener noticias. Intente más tarde.</p>";
         }
     }
 </script>
 
-<!-- CARGA DIRECTA: Sin async/defer para forzar la ejecución -->
+<!-- REEMPLAZA TU_API_KEY_REAL AQUÍ -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVjMpqYkKkELkee_Vp9LCxTKL_DQe6HEA></script>
 
 </body>

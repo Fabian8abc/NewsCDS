@@ -11,15 +11,16 @@
             --bg-light: #f8f9fa;
         }
 
+        /* 1. Reset estricto para evitar el bug de 0x0 en el mapa */
         body, html { 
             margin: 0; 
             padding: 0; 
             height: 100%; 
+            width: 100%;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             overflow: hidden; 
         }
 
-        /* Contenedor principal para la pantalla dividida */
         #app-container {
             display: flex;
             width: 100vw;
@@ -27,7 +28,7 @@
             transition: all 0.4s ease-in-out;
         }
 
-        /* Área del mapa con las correcciones de altura y posición */
+        /* 2. El contenedor del mapa nunca tiene display: none */
         #map-wrapper {
             flex: 1;
             height: 100vh; 
@@ -35,7 +36,7 @@
             transition: all 0.4s ease-in-out;
         }
 
-        /* El mapa anclado firmemente a su contenedor */
+        /* 3. El canvas del mapa forzado a anclarse a las 4 esquinas */
         #map {
             position: absolute;
             top: 0;
@@ -44,9 +45,9 @@
             right: 0;
             width: 100%;
             height: 100%;
+            background-color: #e5e3df; /* Color de fondo por si tarda en cargar */
         }
 
-        /* Panel de Noticias (Oculto por defecto) */
         #news-panel {
             width: 0%;
             height: 100%;
@@ -59,11 +60,11 @@
             box-sizing: border-box;
         }
 
-        /* Clases para activar la vista dividida */
+        /* Pantalla dividida */
         .split-view #news-panel { width: 40%; padding: 20px; }
         .split-view #map-wrapper { flex: 0 0 60%; }
 
-        /* Botón flotante para activar el panel */
+        /* Interfaz UI */
         .btn-toggle {
             position: absolute;
             top: 20px;
@@ -84,7 +85,6 @@
 
         .btn-toggle:hover { background: #1a252f; }
 
-        /* Estilos de las tarjetas de noticias */
         .news-card {
             background: white;
             border-radius: 8px;
@@ -111,24 +111,23 @@
         
         .close-btn { cursor: pointer; font-size: 24px; font-weight: bold; color: #888; }
         .close-btn:hover { color: #333; }
-
     </style>
 </head>
 <body>
 
 <div id="app-container">
     <div id="map-wrapper">
-        <button class="btn-toggle" onclick="toggleDashboard()" id="btn-text">🚨 Monitorear Eventos y Noticias</button>
+        <button class="btn-toggle" onclick="toggleDashboard()" id="btn-text">🚨 Monitorear Riesgos en Ruta</button>
         <div id="map"></div>
     </div>
     
     <div id="news-panel">
         <div class="header-panel">
-            <h2 style="margin: 0; color: #2c3e50;">Alertas en México</h2>
+            <h2 style="margin: 0; color: #2c3e50;">Alertas Logísticas MX</h2>
             <span class="close-btn" onclick="toggleDashboard()">&times;</span>
         </div>
         <div id="news-content">
-            <p style="text-align: center; color: #666;">Cargando rastreo de noticias...</p>
+            <p style="text-align: center; color: #666;">Cargando rastreo de disrupciones...</p>
         </div>
     </div>
 </div>
@@ -136,12 +135,11 @@
 <script>
     let map;
     let isDashboardOpen = false;
+    
+    // Centramos el mapa abarcando el corredor logístico principal (Bajío / Occidente / Centro)
+    const mexicoCenter = { lat: 21.0, lng: -101.5 };
 
-    // 1. Inicializar el Mapa de Google
     function initMap() {
-        // Centrado en la zona centro/Bajío
-        const mexicoCenter = { lat: 21.5, lng: -100.0 };
-
         map = new google.maps.Map(document.getElementById("map"), {
             zoom: 6,
             center: mexicoCenter,
@@ -149,12 +147,11 @@
             streetViewControl: false,
         });
 
-        // Activar la capa de tráfico en tiempo real
+        // Capa de tráfico en tiempo real
         const trafficLayer = new google.maps.TrafficLayer();
         trafficLayer.setMap(map);
     }
 
-    // 2. Controlar la pantalla dividida y forzar el redibujado del mapa
     function toggleDashboard() {
         const container = document.getElementById('app-container');
         const btn = document.getElementById('btn-text');
@@ -162,29 +159,27 @@
 
         if (isDashboardOpen) {
             container.classList.add('split-view');
-            btn.style.display = 'none'; // Ocultar botón
+            btn.style.display = 'none'; 
             fetchNews();
         } else {
             container.classList.remove('split-view');
-            btn.style.display = 'block'; // Mostrar botón
+            btn.style.display = 'block'; 
         }
 
-        // El truco para que el mapa no se borre al dividir la pantalla
+        // 4. El antídoto para el error de display/canvas en blanco.
+        // Esperamos exactamente 400ms (lo que dura la transición CSS) y forzamos el redibujado.
         setTimeout(() => {
             if (map) {
                 google.maps.event.trigger(map, 'resize');
-                const mexicoCenter = { lat: 21.5, lng: -100.0 };
                 map.setCenter(mexicoCenter); 
             }
-        }, 400); // 400ms equivale al tiempo de la transición CSS
+        }, 400); 
     }
 
-    // 3. Extraer noticias de Google News vía RSS2JSON
     async function fetchNews() {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = '<p style="text-align: center;">Cargando alertas logísticas...</p>';
+        contentDiv.innerHTML = '<p style="text-align: center;">Procesando eventos recientes...</p>';
 
-        // Búsqueda afinada
         const query = encodeURIComponent("bloqueo carretero OR trafico OR manifestacion OR choque carretera mexico");
         const rssUrl = `https://news.google.com/rss/search?q=${query}&hl=es-419&gl=MX&ceid=MX:es-419`;
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
@@ -194,7 +189,15 @@
             const data = await response.json();
 
             if (data.status === "ok" && data.items.length > 0) {
-                const newsHtml = data.items.slice(0, 15).map(item => {
+                
+                // 5. ORDENAMIENTO POR FECHA (De más reciente a más antigua)
+                const noticiasOrdenadas = data.items.sort((a, b) => {
+                    // Convertimos las fechas a milisegundos para restarlas y ordenarlas
+                    return new Date(b.pubDate) - new Date(a.pubDate);
+                });
+
+                // Inyectamos las últimas 15 noticias ya ordenadas cronológicamente
+                const newsHtml = noticiasOrdenadas.slice(0, 15).map(item => {
                     const date = new Date(item.pubDate).toLocaleDateString('es-MX', { 
                         weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' 
                     });
@@ -210,7 +213,7 @@
                 
                 contentDiv.innerHTML = newsHtml;
             } else {
-                contentDiv.innerHTML = '<p>No se encontraron alertas viales recientes.</p>';
+                contentDiv.innerHTML = '<p>No se encontraron disrupciones viales recientes.</p>';
             }
         } catch (error) {
             console.error("Error al cargar datos:", error);
@@ -222,7 +225,7 @@
     }
 </script>
 
-<!-- SOLAMENTE REEMPLAZA TU_API_KEY_AQUI -->
+<!-- RECUERDA: Reemplaza TU_API_KEY_AQUI por tu llave real antes de subirlo -->
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVjMpqYkKkELkee_Vp9LCxTKL_DQe6HEA></script>
 
 </body>

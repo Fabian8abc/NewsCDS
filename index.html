@@ -1,153 +1,18 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Torre de Control Logístico MX</title>
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #e74c3c;
-            --bg-light: #f8f9fa;
-        }
-
-        /* 1. Reset estricto para evitar el bug de 0x0 en el mapa */
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            width: 100%;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            overflow: hidden; 
-        }
-
-        #app-container {
-            display: flex;
-            width: 100vw;
-            height: 100vh;
-            transition: all 0.4s ease-in-out;
-        }
-
-        /* 2. El contenedor del mapa nunca tiene display: none */
-        #map-wrapper {
-            flex: 1;
-            height: 100vh; 
-            position: relative;
-            transition: all 0.4s ease-in-out;
-        }
-
-        /* 3. El canvas del mapa forzado a anclarse a las 4 esquinas */
-        #map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #e5e3df; /* Color de fondo por si tarda en cargar */
-        }
-
-        #news-panel {
-            width: 0%;
-            height: 100%;
-            background: var(--bg-light);
-            border-left: 1px solid #ddd;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.05);
-            overflow-y: auto;
-            transition: width 0.4s ease-in-out;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        /* Pantalla dividida */
-        .split-view #news-panel { width: 40%; padding: 20px; }
-        .split-view #map-wrapper { flex: 0 0 60%; }
-
-        /* Interfaz UI */
-        .btn-toggle {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--primary);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 10;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            border: none;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-
-        .btn-toggle:hover { background: #1a252f; }
-
-        .news-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            border-left: 4px solid var(--accent);
-        }
-
-        .news-card h3 { margin: 0 0 10px 0; font-size: 16px; color: #333; }
-        .news-card p { margin: 0 0 10px 0; font-size: 13px; color: #666; }
-        .news-card a { color: var(--primary); text-decoration: none; font-weight: bold; font-size: 13px; }
-        .news-card a:hover { text-decoration: underline; }
-        .news-date { font-size: 11px; color: #999; display: block; margin-top: 5px; }
-
-        .header-panel {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 10px;
-        }
-        
-        .close-btn { cursor: pointer; font-size: 24px; font-weight: bold; color: #888; }
-        .close-btn:hover { color: #333; }
-    </style>
-</head>
-<body>
-
-<div id="app-container">
-    <div id="map-wrapper">
-        <button class="btn-toggle" onclick="toggleDashboard()" id="btn-text">🚨 Monitorear Riesgos en Ruta</button>
-        <div id="map"></div>
-    </div>
-    
-    <div id="news-panel">
-        <div class="header-panel">
-            <h2 style="margin: 0; color: #2c3e50;">Alertas Logísticas MX</h2>
-            <span class="close-btn" onclick="toggleDashboard()">&times;</span>
-        </div>
-        <div id="news-content">
-            <p style="text-align: center; color: #666;">Cargando rastreo de disrupciones...</p>
-        </div>
-    </div>
-</div>
-
 <script>
     let map;
     let isDashboardOpen = false;
     
-    // Centramos el mapa abarcando el corredor logístico principal (Bajío / Occidente / Centro)
-    const mexicoCenter = { lat: 21.0, lng: -101.5 };
+    // Centramos el mapa en Guadalajara para monitorear el corredor Occidente/Bajío
+    const occidenteCenter = { lat: 20.6596, lng: -103.3496 };
 
     function initMap() {
         map = new google.maps.Map(document.getElementById("map"), {
             zoom: 6,
-            center: mexicoCenter,
+            center: occidenteCenter,
             mapTypeControl: false,
             streetViewControl: false,
         });
 
-        // Capa de tráfico en tiempo real
         const trafficLayer = new google.maps.TrafficLayer();
         trafficLayer.setMap(map);
     }
@@ -166,12 +31,10 @@
             btn.style.display = 'block'; 
         }
 
-        // 4. El antídoto para el error de display/canvas en blanco.
-        // Esperamos exactamente 400ms (lo que dura la transición CSS) y forzamos el redibujado.
         setTimeout(() => {
             if (map) {
                 google.maps.event.trigger(map, 'resize');
-                map.setCenter(mexicoCenter); 
+                map.setCenter(occidenteCenter); 
             }
         }, 400); 
     }
@@ -180,7 +43,9 @@
         const contentDiv = document.getElementById('news-content');
         contentDiv.innerHTML = '<p style="text-align: center;">Procesando eventos recientes...</p>';
 
-        const query = encodeURIComponent("bloqueo carretero OR trafico OR manifestacion OR choque carretera mexico");
+        // BÚSQUEDA AMPLIADA CON TUS NUEVAS PALABRAS CLAVE
+        const queryTerm = "bloqueos OR manifestaciones OR trafico OR lluvias OR inundaciones OR huelgas OR cadena de suministro";
+        const query = encodeURIComponent(`${queryTerm} mexico`);
         const rssUrl = `https://news.google.com/rss/search?q=${query}&hl=es-419&gl=MX&ceid=MX:es-419`;
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 
@@ -190,13 +55,10 @@
 
             if (data.status === "ok" && data.items.length > 0) {
                 
-                // 5. ORDENAMIENTO POR FECHA (De más reciente a más antigua)
                 const noticiasOrdenadas = data.items.sort((a, b) => {
-                    // Convertimos las fechas a milisegundos para restarlas y ordenarlas
                     return new Date(b.pubDate) - new Date(a.pubDate);
                 });
 
-                // Inyectamos las últimas 15 noticias ya ordenadas cronológicamente
                 const newsHtml = noticiasOrdenadas.slice(0, 15).map(item => {
                     const date = new Date(item.pubDate).toLocaleDateString('es-MX', { 
                         weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' 
@@ -224,9 +86,3 @@
         }
     }
 </script>
-
-<!-- RECUERDA: Reemplaza TU_API_KEY_AQUI por tu llave real antes de subirlo -->
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVjMpqYkKkELkee_Vp9LCxTKL_DQe6HEA></script>
-
-</body>
-</html>

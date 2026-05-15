@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Tower MX - Riesgos en Ruta</title>
-    <!-- Cargamos la librería oficial de Google Charts -->
+    <title>Control Tower MX - S&OP y Riesgos</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         :root {
-            --primary: #2c3e50;
-            --accent: #e74c3c;
+            --tactico: #e74c3c;
+            --estrategico: #2980b9;
             --bg-light: #f4f7f6;
+            --text-dark: #2c3e50;
         }
 
         body, html { 
@@ -26,13 +26,35 @@
         #map-wrapper {
             flex: 1; height: 100%; position: relative;
             display: flex; align-items: center; justify-content: center;
-            background-color: #e5f1f6; /* Color de agua suave */
+            background-color: #e5f1f6; 
             transition: all 0.4s ease-in-out;
         }
 
         #regions_div {
             width: 100%; height: 100%;
         }
+
+        /* Selector de Modos (Toggle) */
+        .mode-selector {
+            position: absolute;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 50px;
+            display: flex;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .mode-btn {
+            padding: 12px 24px; border: none; background: transparent;
+            font-weight: bold; font-size: 14px; cursor: pointer;
+            transition: all 0.3s; color: #7f8c8d; outline: none;
+        }
+
+        .mode-btn.active-tactico { background: var(--tactico); color: white; }
+        .mode-btn.active-estrategico { background: var(--estrategico); color: white; }
 
         #news-panel {
             width: 0%; height: 100%; background: var(--bg-light);
@@ -47,16 +69,19 @@
         .news-card {
             background: white; border-radius: 8px; padding: 15px;
             margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            border-left: 5px solid var(--accent);
+            transition: border-left 0.3s;
         }
 
-        .news-card h3 { margin: 0 0 8px 0; font-size: 14px; line-height: 1.4; color: #333; }
+        .card-tactico { border-left: 5px solid var(--tactico); }
+        .card-estrategico { border-left: 5px solid var(--estrategico); }
+
+        .news-card h3 { margin: 0 0 8px 0; font-size: 14px; line-height: 1.4; color: var(--text-dark); }
         .news-date { font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 5px; }
-        .news-link { color: var(--primary); font-size: 12px; text-decoration: none; font-weight: bold; }
+        .news-link { font-size: 12px; text-decoration: none; font-weight: bold; }
         
         .tag {
-            display: inline-block; padding: 2px 6px; background: #eee;
-            border-radius: 4px; font-size: 10px; color: #555; margin-right: 5px;
+            display: inline-block; padding: 3px 8px; background: #eee;
+            border-radius: 4px; font-size: 10px; color: #555; margin-right: 5px; font-weight: bold;
         }
     </style>
 </head>
@@ -64,12 +89,17 @@
 
 <div id="app-container">
     <div id="map-wrapper">
+        <!-- Control de Capas -->
+        <div class="mode-selector">
+            <button id="btn-tactico" class="mode-btn active-tactico" onclick="switchMode('tactico')">⚠️ Táctico: Riesgos en Ruta</button>
+            <button id="btn-estrategico" class="mode-btn" onclick="switchMode('estrategico')">🏗️ Estratégico: Obras y Demanda</button>
+        </div>
         <div id="regions_div"></div>
     </div>
     
     <div id="news-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-            <h2 id="panel-title" style="margin:0; font-size: 1.4rem; color: var(--primary);">Disrupciones Viales</h2>
+            <h2 id="panel-title" style="margin:0; font-size: 1.4rem; color: var(--text-dark);">Monitoreo</h2>
             <button onclick="cerrarPanel()" style="border:none; background:none; font-size:28px; cursor:pointer; color:#888;">&times;</button>
         </div>
         <div id="news-content"></div>
@@ -77,7 +107,6 @@
 </div>
 
 <script>
-    // Diccionario para traducir los códigos ISO de Google al nombre real para la búsqueda
     const stateNames = {
         'MX-AGU': 'Aguascalientes', 'MX-BCN': 'Baja California', 'MX-BCS': 'Baja California Sur',
         'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 'MX-CMX': 'Ciudad de México',
@@ -91,14 +120,13 @@
     };
 
     let chart, data, options;
+    let currentMode = 'tactico'; // Modos: 'tactico' o 'estrategico'
+    let currentStateSelected = null;
 
-    // 1. Inicializar Google GeoCharts
-    google.charts.load('current', {
-        'packages':['geochart'],
-    });
-    google.charts.setOnLoadCallback(drawRegionsMap);
+    google.charts.load('current', {'packages':['geochart']});
+    google.charts.setOnLoadCallback(initMap);
 
-    function drawRegionsMap() {
+    function initMap() {
         data = google.visualization.arrayToDataTable([
             ['Estado', 'Monitoreo'],
             ['MX-AGU', 0], ['MX-BCN', 0], ['MX-BCS', 0], ['MX-CAM', 0], ['MX-CHP', 0],
@@ -110,41 +138,67 @@
             ['MX-YUC', 0], ['MX-ZAC', 0]
         ]);
 
-        options = {
-            region: 'MX', // Enfocado solo en México
-            resolution: 'provinces', // Nivel estatal
-            colorAxis: {colors: ['#3498db']}, // Color de los estados
-            backgroundColor: '#e5f1f6', // Fondo del mar
-            datalessRegionColor: '#f4f4f4',
-            defaultColor: '#3498db',
-            tooltip: { trigger: 'focus' },
-            keepAspectRatio: true
-        };
-
         chart = new google.visualization.GeoChart(document.getElementById('regions_div'));
 
-        // Evento de clic en un estado
         google.visualization.events.addListener(chart, 'select', () => {
             const selection = chart.getSelection();
             if (selection.length > 0) {
-                // Obtener el código ISO del estado clickeado
                 const stateIso = data.getValue(selection[0].row, 0);
-                const estadoReal = stateNames[stateIso];
-                abrirPanel(estadoReal);
+                currentStateSelected = stateNames[stateIso];
+                abrirPanel(currentStateSelected);
             }
         });
 
-        chart.draw(data, options);
+        drawMapWithCurrentMode();
     }
 
-    // 2. Control de la Interfaz
+    function drawMapWithCurrentMode() {
+        const mapColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9'; // Rojo o Azul
+        
+        options = {
+            region: 'MX',
+            resolution: 'provinces',
+            colorAxis: {colors: [mapColor]}, 
+            backgroundColor: '#e5f1f6',
+            datalessRegionColor: '#f4f4f4',
+            defaultColor: mapColor,
+            tooltip: { trigger: 'focus' },
+            keepAspectRatio: true
+        };
+        
+        if(chart && data) chart.draw(data, options);
+    }
+
+    // Cambiar de capa
+    function switchMode(mode) {
+        currentMode = mode;
+        
+        // Actualizar UI de botones
+        document.getElementById('btn-tactico').classList.remove('active-tactico');
+        document.getElementById('btn-estrategico').classList.remove('active-estrategico');
+        
+        if (mode === 'tactico') {
+            document.getElementById('btn-tactico').classList.add('active-tactico');
+        } else {
+            document.getElementById('btn-estrategico').classList.add('active-estrategico');
+        }
+
+        // Redibujar mapa con nuevo color
+        drawMapWithCurrentMode();
+
+        // Si el panel está abierto, recargar las noticias con el nuevo filtro
+        if (currentStateSelected && document.getElementById('app-container').classList.contains('split-view')) {
+            abrirPanel(currentStateSelected);
+        }
+    }
+
     function abrirPanel(estadoNombre) {
         const container = document.getElementById('app-container');
-        document.getElementById('panel-title').innerText = `Rutas en ${estadoNombre}`;
-        container.classList.add('split-view');
+        const titlePrefix = currentMode === 'tactico' ? 'Riesgos Viales en' : 'Proyectos en';
+        document.getElementById('panel-title').innerText = `${titlePrefix} ${estadoNombre}`;
         
-        // Redibujar el mapa tras la animación (400ms) para que se ajuste a su nuevo tamaño
-        setTimeout(() => chart.draw(data, options), 400);
+        container.classList.add('split-view');
+        setTimeout(() => drawMapWithCurrentMode(), 400); // Redibujar tras animación
         
         fetchNewsForState(estadoNombre);
     }
@@ -152,16 +206,28 @@
     function cerrarPanel() {
         const container = document.getElementById('app-container');
         container.classList.remove('split-view');
-        setTimeout(() => chart.draw(data, options), 400);
+        currentStateSelected = null;
+        setTimeout(() => drawMapWithCurrentMode(), 400);
     }
 
-    // 3. Extracción de Datos Estrictamente Logísticos
     async function fetchNewsForState(estadoNombre) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando telemetría de noticias para ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando radar para ${estadoNombre}...</p>`;
 
-        // FILTRO ESTRICTO: Estado + Infraestructura + Disrupción
-        const searchTerms = `"${estadoNombre}" AND (carretera OR autopista OR caseta OR libramiento OR peaje) AND (bloqueo OR cierre OR accidente OR manifestacion OR obras OR trafico)`;
+        // Motores de búsqueda independientes
+        let searchTerms = "";
+        let tagHtml = "";
+        let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
+        let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
+
+        if (currentMode === 'tactico') {
+            searchTerms = `"${estadoNombre}" AND (carretera OR autopista OR caseta OR libramiento) AND (bloqueo OR cierre OR accidente OR manifestacion OR obras OR trafico)`;
+            tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
+        } else {
+            // Ampliado para captar infraestructura comercial, industrial y pública
+            searchTerms = `"${estadoNombre}" AND (construcción OR obra OR inversión OR hotel OR hospital OR corporativo OR infraestructura OR "perfiles de aluminio" OR licitación)`;
+            tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
+        }
         
         const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419`;
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
@@ -171,7 +237,6 @@
             const dataResponse = await res.json();
 
             if (dataResponse.status === "ok" && dataResponse.items.length > 0) {
-                // Orden cronológico (Más reciente primero)
                 const sortedItems = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 
                 contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => {
@@ -179,32 +244,31 @@
                         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                     });
                     return `
-                        <div class="news-card">
-                            <div class="news-date">📌 ${dateStr}</div>
+                        <div class="news-card ${cardClass}">
+                            <div class="news-date">🗓️ ${dateStr}</div>
                             <h3>${item.title}</h3>
-                            <div>
-                                <span class="tag">Logística</span>
-                                <span class="tag">Ruta</span>
-                            </div>
-                            <br>
-                            <a class="news-link" href="${item.link}" target="_blank">VER REPORTE DE INCIDENTE ➜</a>
+                            <div style="margin-bottom: 8px;">${tagHtml}</div>
+                            <a class="news-link" href="${item.link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
                         </div>
                     `;
                 }).join('');
             } else {
+                const emptyMsg = currentMode === 'tactico' 
+                    ? `No hay disrupciones carreteras recientes reportadas en ${estadoNombre}.`
+                    : `No se encontraron reportes recientes de construcción o inversión en ${estadoNombre}.`;
+                
                 contentDiv.innerHTML = `
                     <div style="text-align:center; padding: 20px;">
-                        <p style="font-size: 40px; margin: 0;">✅</p>
-                        <p style="color:#7f8c8d;">No hay bloqueos ni disrupciones carreteras reportadas en las últimas horas en ${estadoNombre}.</p>
+                        <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
+                        <p style="color:#7f8c8d;">${emptyMsg}</p>
                     </div>`;
             }
         } catch (err) {
             console.error("Error al extraer alertas:", err);
-            contentDiv.innerHTML = "<p>Error de conexión al procesar los incidentes.</p>";
+            contentDiv.innerHTML = "<p>Error de conexión al procesar la información.</p>";
         }
     }
 
-    // Redibujar mapa si el usuario cambia el tamaño de la ventana de su navegador
     window.addEventListener('resize', () => {
         if(chart && data && options) chart.draw(data, options);
     });

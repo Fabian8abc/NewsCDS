@@ -3,191 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiTrack MX - Monitor de Riesgos Vectorial</title>
+    <title>Control Tower MX - Riesgos en Ruta</title>
+    <!-- Cargamos la librería oficial de Google Charts -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         :root {
             --primary: #2c3e50;
             --accent: #e74c3c;
-            --bg-light: #f8f9fa;
-            --map-bg: #ecf0f1;
-            --state-fill: #bdc3c7;
-            --state-hover: #34495e;
+            --bg-light: #f4f7f6;
         }
 
         body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            width: 100%;
+            margin: 0; padding: 0; height: 100%; width: 100%;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            overflow: hidden; 
-            background-color: var(--map-bg);
+            overflow: hidden; background-color: #ffffff;
         }
 
         #app-container {
-            display: flex;
-            width: 100vw;
-            height: 100vh;
+            display: flex; width: 100vw; height: 100vh;
         }
 
         #map-wrapper {
-            flex: 1;
-            height: 100%; 
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            box-sizing: border-box;
+            flex: 1; height: 100%; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            background-color: #e5f1f6; /* Color de agua suave */
+            transition: all 0.4s ease-in-out;
         }
 
-        /* Contenedor del mapa SVG */
-        .svg-map-container {
-            width: 100%;
-            height: 100%;
-            max-height: 90vh;
-        }
-
-        /* Estilos interactivos para los estados del mapa */
-        .estado {
-            fill: var(--state-fill);
-            stroke: #ffffff;
-            stroke-width: 1.5;
-            transition: fill 0.2s ease, transform 0.2s ease;
-            cursor: pointer;
-        }
-
-        .estado:hover {
-            fill: var(--state-hover);
-        }
-
-        /* Estado seleccionado activo */
-        .estado.activo {
-            fill: var(--accent);
+        #regions_div {
+            width: 100%; height: 100%;
         }
 
         #news-panel {
-            width: 0%;
-            height: 100%;
-            background: var(--bg-light);
+            width: 0%; height: 100%; background: var(--bg-light);
             border-left: 1px solid #ddd;
             transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow-y: auto;
-            box-sizing: border-box;
+            overflow-y: auto; box-sizing: border-box;
         }
 
         .split-view #news-panel { width: 40%; padding: 20px; }
         .split-view #map-wrapper { flex: 0 0 60%; }
 
-        /* Tooltip flotante para el Hover */
-        #map-tooltip {
-            position: absolute;
-            padding: 8px 12px;
-            background: rgba(44, 62, 80, 0.9);
-            color: white;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            pointer-events: none;
-            display: none;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
         .news-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            background: white; border-radius: 8px; padding: 15px;
+            margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             border-left: 5px solid var(--accent);
         }
 
         .news-card h3 { margin: 0 0 8px 0; font-size: 14px; line-height: 1.4; color: #333; }
         .news-date { font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 5px; }
         .news-link { color: var(--primary); font-size: 12px; text-decoration: none; font-weight: bold; }
+        
+        .tag {
+            display: inline-block; padding: 2px 6px; background: #eee;
+            border-radius: 4px; font-size: 10px; color: #555; margin-right: 5px;
+        }
     </style>
 </head>
 <body>
 
-<div id="map-tooltip"></div>
-
 <div id="app-container">
     <div id="map-wrapper">
-        <div class="svg-map-container">
-            <!-- SVG Simplificado de México para interactividad nativa -->
-            <svg id="mexico-svg" viewBox="0 0 1000 650" width="100%" height="100%">
-                <!-- Baja California -->
-                <path class="estado" data-nombre="Baja California" d="M110,40 L160,110 L120,180 L80,120 Z" />
-                <!-- Baja California Sur -->
-                <path class="estado" data-nombre="Baja California Sur" d="M120,180 L160,250 L200,320 L160,330 L110,250 Z" />
-                <!-- Sonora -->
-                <path class="estado" data-nombre="Sonora" d="M160,110 L260,100 L290,210 L190,210 Z" />
-                <!-- Chihuahua -->
-                <path class="estado" data-nombre="Chihuahua" d="M260,100 L410,110 L390,260 L290,260 L290,210 Z" />
-                <!-- Coahuila -->
-                <path class="estado" data-nombre="Coahuila" d="M410,110 L510,180 L480,280 L390,260 Z" />
-                <!-- Sinaloa -->
-                <path class="estado" data-nombre="Sinaloa" d="M190,210 L290,260 L320,330 L250,380 Z" />
-                <!-- Durango -->
-                <path class="estado" data-nombre="Durango" d="M290,260 L390,260 L390,340 L320,330 Z" />
-                <!-- Nuevo León -->
-                <path class="estado" data-nombre="Nuevo León" d="M510,180 L540,210 L510,290 L480,280 Z" />
-                <!-- Tamaulipas -->
-                <path class="estado" data-nombre="Tamaulipas" d="M540,210 L580,280 L560,360 L510,290 Z" />
-                <!-- Nayarit -->
-                <path class="estado" data-nombre="Nayarit" d="M320,330 L360,360 L340,390 L300,370 Z" />
-                <!-- Zacatecas -->
-                <path class="estado" data-nombre="Zacatecas" d="M390,260 L450,290 L430,370 L360,360 L390,340 Z" />
-                <!-- San Luis Potosí -->
-                <path class="estado" data-nombre="San Luis Potosí" d="M450,290 L510,290 L530,370 L460,380 L430,370 Z" />
-                <!-- Jalisco -->
-                <path class="estado" data-nombre="Jalisco" d="M340,390 L410,390 L420,440 L330,440 L310,410 Z" />
-                <!-- Michoacán -->
-                <path class="estado" data-nombre="Michoacán" d="M410,440 L480,440 L460,490 L390,470 Z" />
-                <!-- Colima -->
-                <path class="estado" data-nombre="Colima" d="M380,450 L400,450 L390,470 Z" />
-                <!-- Guanajuato -->
-                <path class="estado" data-nombre="Guanajuato" d="M410,390 L450,390 L450,430 L410,430 Z" />
-                <!-- Querétaro -->
-                <path class="estado" data-nombre="Querétaro" d="M450,390 L480,390 L470,420 L450,420 Z" />
-                <!-- Hidalgo -->
-                <path class="estado" data-nombre="Hidalgo" d="M480,390 L520,390 L500,430 L470,420 Z" />
-                <!-- Estado de México -->
-                <path class="estado" data-nombre="Estado de México" d="M460,430 L490,430 L480,460 L450,460 Z" />
-                <!-- Guerrero -->
-                <path class="estado" data-nombre="Guerrero" d="M460,490 L560,510 L520,550 L450,530 Z" />
-                <!-- Puebla -->
-                <path class="estado" data-nombre="Puebla" d="M490,430 L540,440 L540,490 L480,460 Z" />
-                <!-- Veracruz -->
-                <path class="estado" data-nombre="Veracruz" d="M530,370 L580,360 L680,470 L600,490 L540,440 Z" />
-                <!-- Oaxaca -->
-                <path class="estado" data-nombre="Oaxaca" d="M560,510 L660,520 L630,580 L520,550 Z" />
-                <!-- Chiapas -->
-                <path class="estado" data-nombre="Chiapas" d="M660,520 L740,540 L700,610 L630,580 Z" />
-                <!-- Tabasco -->
-                <path class="estado" data-nombre="Tabasco" d="M660,490 L740,490 L740,540 L660,520 Z" />
-                <!-- Campeche -->
-                <path class="estado" data-nombre="Campeche" d="M740,490 L810,460 L830,530 L740,540 Z" />
-                <!-- Yucatán -->
-                <path class="estado" data-nombre="Yucatán" d="M790,410 L880,420 L810,460 Z" />
-                <!-- Quintana Roo -->
-                <path class="estado" data-nombre="Quintana Roo" d="M880,420 L850,510 L830,530 L810,460 Z" />
-                <!-- Aguascalientes -->
-                <circle class="estado" data-nombre="Aguascalientes" cx="410" cy="370" r="12" />
-                <!-- Morelos -->
-                <circle class="estado" data-nombre="Morelos" cx="490" cy="470" r="10" />
-                <!-- Tlaxcala -->
-                <circle class="estado" data-nombre="Tlaxcala" cx="510" cy="450" r="8" />
-                <!-- CDMX -->
-                <circle class="estado" data-nombre="Ciudad de México" cx="475" cy="445" r="10" />
-            </svg>
-        </div>
+        <div id="regions_div"></div>
     </div>
     
     <div id="news-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-            <h2 id="panel-title" style="margin:0; font-size: 1.4rem; color: var(--primary);">Alertas</h2>
+            <h2 id="panel-title" style="margin:0; font-size: 1.4rem; color: var(--primary);">Disrupciones Viales</h2>
             <button onclick="cerrarPanel()" style="border:none; background:none; font-size:28px; cursor:pointer; color:#888;">&times;</button>
         </div>
         <div id="news-content"></div>
@@ -195,63 +77,102 @@
 </div>
 
 <script>
-    const tooltip = document.getElementById('map-tooltip');
-    const container = document.getElementById('app-container');
-    const panelTitle = document.getElementById('panel-title');
-    const estados = document.querySelectorAll('.estado');
+    // Diccionario para traducir los códigos ISO de Google al nombre real para la búsqueda
+    const stateNames = {
+        'MX-AGU': 'Aguascalientes', 'MX-BCN': 'Baja California', 'MX-BCS': 'Baja California Sur',
+        'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 'MX-CMX': 'Ciudad de México',
+        'MX-COA': 'Coahuila', 'MX-COL': 'Colima', 'MX-DUR': 'Durango', 'MX-GRO': 'Guerrero',
+        'MX-GUA': 'Guanajuato', 'MX-HID': 'Hidalgo', 'MX-JAL': 'Jalisco', 'MX-MEX': 'Estado de México',
+        'MX-MIC': 'Michoacán', 'MX-MOR': 'Morelos', 'MX-NAY': 'Nayarit', 'MX-NLE': 'Nuevo León',
+        'MX-OAX': 'Oaxaca', 'MX-PUE': 'Puebla', 'MX-QUE': 'Querétaro', 'MX-ROO': 'Quintana Roo',
+        'MX-SLP': 'San Luis Potosí', 'MX-SIN': 'Sinaloa', 'MX-SON': 'Sonora', 'MX-TAB': 'Tabasco',
+        'MX-TAM': 'Tamaulipas', 'MX-TLA': 'Tlaxcala', 'MX-VER': 'Veracruz', 'MX-YUC': 'Yucatán',
+        'MX-ZAC': 'Zacatecas'
+    };
 
-    estados.forEach(estado => {
-        // Interacción Hover (Acercar puntero)
-        estado.addEventListener('mouseover', (e) => {
-            const nombre = estado.getAttribute('data-nombre');
-            tooltip.innerText = nombre;
-            tooltip.style.display = 'block';
-        });
+    let chart, data, options;
 
-        estado.addEventListener('mousemove', (e) => {
-            tooltip.style.left = (e.pageX + 15) + 'px';
-            tooltip.style.top = (e.pageY + 15) + 'px';
-        });
-
-        estado.addEventListener('mouseout', () => {
-            tooltip.style.display = 'none';
-        });
-
-        // Interacción Click (Abrir media pantalla y buscar noticias de ese estado)
-        estado.addEventListener('click', () => {
-            // Remover clase activo de otros estados y ponerla en el seleccionado
-            estados.forEach(est => est.classList.remove('activo'));
-            estado.classList.add('activo');
-
-            const nombreEstado = estado.getAttribute('data-nombre');
-            panelTitle.innerText = `Alertas en ${nombreEstado}`;
-            container.classList.add('split-view');
-            
-            fetchNewsForState(nombreEstado);
-        });
+    // 1. Inicializar Google GeoCharts
+    google.charts.load('current', {
+        'packages':['geochart'],
     });
+    google.charts.setOnLoadCallback(drawRegionsMap);
 
-    function cerrarPanel() {
-        container.classList.remove('split-view');
-        estados.forEach(est => est.classList.remove('activo'));
+    function drawRegionsMap() {
+        data = google.visualization.arrayToDataTable([
+            ['Estado', 'Monitoreo'],
+            ['MX-AGU', 0], ['MX-BCN', 0], ['MX-BCS', 0], ['MX-CAM', 0], ['MX-CHP', 0],
+            ['MX-CHH', 0], ['MX-CMX', 0], ['MX-COA', 0], ['MX-COL', 0], ['MX-DUR', 0],
+            ['MX-GRO', 0], ['MX-GUA', 0], ['MX-HID', 0], ['MX-JAL', 0], ['MX-MEX', 0],
+            ['MX-MIC', 0], ['MX-MOR', 0], ['MX-NAY', 0], ['MX-NLE', 0], ['MX-OAX', 0],
+            ['MX-PUE', 0], ['MX-QUE', 0], ['MX-ROO', 0], ['MX-SLP', 0], ['MX-SIN', 0],
+            ['MX-SON', 0], ['MX-TAB', 0], ['MX-TAM', 0], ['MX-TLA', 0], ['MX-VER', 0],
+            ['MX-YUC', 0], ['MX-ZAC', 0]
+        ]);
+
+        options = {
+            region: 'MX', // Enfocado solo en México
+            resolution: 'provinces', // Nivel estatal
+            colorAxis: {colors: ['#3498db']}, // Color de los estados
+            backgroundColor: '#e5f1f6', // Fondo del mar
+            datalessRegionColor: '#f4f4f4',
+            defaultColor: '#3498db',
+            tooltip: { trigger: 'focus' },
+            keepAspectRatio: true
+        };
+
+        chart = new google.visualization.GeoChart(document.getElementById('regions_div'));
+
+        // Evento de clic en un estado
+        google.visualization.events.addListener(chart, 'select', () => {
+            const selection = chart.getSelection();
+            if (selection.length > 0) {
+                // Obtener el código ISO del estado clickeado
+                const stateIso = data.getValue(selection[0].row, 0);
+                const estadoReal = stateNames[stateIso];
+                abrirPanel(estadoReal);
+            }
+        });
+
+        chart.draw(data, options);
     }
 
+    // 2. Control de la Interfaz
+    function abrirPanel(estadoNombre) {
+        const container = document.getElementById('app-container');
+        document.getElementById('panel-title').innerText = `Rutas en ${estadoNombre}`;
+        container.classList.add('split-view');
+        
+        // Redibujar el mapa tras la animación (400ms) para que se ajuste a su nuevo tamaño
+        setTimeout(() => chart.draw(data, options), 400);
+        
+        fetchNewsForState(estadoNombre);
+    }
+
+    function cerrarPanel() {
+        const container = document.getElementById('app-container');
+        container.classList.remove('split-view');
+        setTimeout(() => chart.draw(data, options), 400);
+    }
+
+    // 3. Extracción de Datos Estrictamente Logísticos
     async function fetchNewsForState(estadoNombre) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p>Buscando disrupciones en ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando telemetría de noticias para ${estadoNombre}...</p>`;
 
-        // Estructuramos la búsqueda sumando el nombre del estado clickeado
-        const keywords = `(bloqueos OR huelgas OR manifestaciones OR inundaciones OR trafico) "${estadoNombre}"`;
-        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(keywords)}&hl=es-419&gl=MX&ceid=MX:es-419`;
+        // FILTRO ESTRICTO: Estado + Infraestructura + Disrupción
+        const searchTerms = `"${estadoNombre}" AND (carretera OR autopista OR caseta OR libramiento OR peaje) AND (bloqueo OR cierre OR accidente OR manifestacion OR obras OR trafico)`;
+        
+        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419`;
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 
         try {
             const res = await fetch(apiUrl);
-            const data = await res.json();
+            const dataResponse = await res.json();
 
-            if (data.status === "ok" && data.items.length > 0) {
-                // Ordenar por fecha: Más reciente primero
-                const sortedItems = data.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+            if (dataResponse.status === "ok" && dataResponse.items.length > 0) {
+                // Orden cronológico (Más reciente primero)
+                const sortedItems = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 
                 contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => {
                     const dateStr = new Date(item.pubDate).toLocaleString('es-MX', {
@@ -259,20 +180,34 @@
                     });
                     return `
                         <div class="news-card">
-                            <div class="news-date">${dateStr}</div>
+                            <div class="news-date">📌 ${dateStr}</div>
                             <h3>${item.title}</h3>
-                            <a class="news-link" href="${item.link}" target="_blank">VER DETALLES ➜</a>
+                            <div>
+                                <span class="tag">Logística</span>
+                                <span class="tag">Ruta</span>
+                            </div>
+                            <br>
+                            <a class="news-link" href="${item.link}" target="_blank">VER REPORTE DE INCIDENTE ➜</a>
                         </div>
                     `;
                 }).join('');
             } else {
-                contentDiv.innerHTML = `<p style="color:#7f8c8d; text-align:center;">Sin disrupciones de alto impacto reportadas recientemente en ${estadoNombre}.</p>`;
+                contentDiv.innerHTML = `
+                    <div style="text-align:center; padding: 20px;">
+                        <p style="font-size: 40px; margin: 0;">✅</p>
+                        <p style="color:#7f8c8d;">No hay bloqueos ni disrupciones carreteras reportadas en las últimas horas en ${estadoNombre}.</p>
+                    </div>`;
             }
         } catch (err) {
-            console.error("Error Fetching News:", err);
-            contentDiv.innerHTML = "<p>Error al conectar con el servidor de noticias.</p>";
+            console.error("Error al extraer alertas:", err);
+            contentDiv.innerHTML = "<p>Error de conexión al procesar los incidentes.</p>";
         }
     }
+
+    // Redibujar mapa si el usuario cambia el tamaño de la ventana de su navegador
+    window.addEventListener('resize', () => {
+        if(chart && data && options) chart.draw(data, options);
+    });
 </script>
 
 </body>

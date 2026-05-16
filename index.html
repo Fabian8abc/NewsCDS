@@ -214,18 +214,19 @@
         const contentDiv = document.getElementById('news-content');
         contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando radar para ${estadoNombre}...</p>`;
 
-        // Motores de búsqueda independientes
+        // Motores de búsqueda simplificados para evitar colapso del RSS
         let searchTerms = "";
         let tagHtml = "";
         let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
         let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
 
         if (currentMode === 'tactico') {
-            searchTerms = `"${estadoNombre}" AND (carretera OR autopista OR caseta OR libramiento) AND (bloqueo OR cierre OR accidente OR manifestacion OR obras OR trafico)`;
+            // Búsqueda lineal simplificada
+            searchTerms = `${estadoNombre} carretera bloqueos OR accidentes OR trafico OR cierre`;
             tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
         } else {
-            // Ampliado para captar infraestructura comercial, industrial y pública
-            searchTerms = `"${estadoNombre}" AND (construcción OR obra OR inversión OR hotel OR hospital OR corporativo OR infraestructura OR "perfiles de aluminio" OR licitación)`;
+            // Búsqueda lineal simplificada
+            searchTerms = `${estadoNombre} infraestructura OR inversion OR construccion OR proyectos`;
             tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
         }
         

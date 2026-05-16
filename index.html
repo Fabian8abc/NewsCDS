@@ -34,7 +34,6 @@
             width: 100%; height: 100%;
         }
 
-        /* Selector de Modos (Toggle) */
         .mode-selector {
             position: absolute;
             top: 20px; left: 50%;
@@ -89,7 +88,6 @@
 
 <div id="app-container">
     <div id="map-wrapper">
-        <!-- Control de Capas -->
         <div class="mode-selector">
             <button id="btn-tactico" class="mode-btn active-tactico" onclick="switchMode('tactico')">⚠️ Táctico: Riesgos en Ruta</button>
             <button id="btn-estrategico" class="mode-btn" onclick="switchMode('estrategico')">🏗️ Estratégico: Obras y Demanda</button>
@@ -120,7 +118,7 @@
     };
 
     let chart, data, options;
-    let currentMode = 'tactico'; // Modos: 'tactico' o 'estrategico'
+    let currentMode = 'tactico'; 
     let currentStateSelected = null;
 
     google.charts.load('current', {'packages':['geochart']});
@@ -153,7 +151,7 @@
     }
 
     function drawMapWithCurrentMode() {
-        const mapColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9'; // Rojo o Azul
+        const mapColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9'; 
         
         options = {
             region: 'MX',
@@ -169,11 +167,9 @@
         if(chart && data) chart.draw(data, options);
     }
 
-    // Cambiar de capa
     function switchMode(mode) {
         currentMode = mode;
         
-        // Actualizar UI de botones
         document.getElementById('btn-tactico').classList.remove('active-tactico');
         document.getElementById('btn-estrategico').classList.remove('active-estrategico');
         
@@ -183,10 +179,8 @@
             document.getElementById('btn-estrategico').classList.add('active-estrategico');
         }
 
-        // Redibujar mapa con nuevo color
         drawMapWithCurrentMode();
 
-        // Si el panel está abierto, recargar las noticias con el nuevo filtro
         if (currentStateSelected && document.getElementById('app-container').classList.contains('split-view')) {
             abrirPanel(currentStateSelected);
         }
@@ -198,7 +192,7 @@
         document.getElementById('panel-title').innerText = `${titlePrefix} ${estadoNombre}`;
         
         container.classList.add('split-view');
-        setTimeout(() => drawMapWithCurrentMode(), 400); // Redibujar tras animación
+        setTimeout(() => drawMapWithCurrentMode(), 400); 
         
         fetchNewsForState(estadoNombre);
     }
@@ -210,38 +204,51 @@
         setTimeout(() => drawMapWithCurrentMode(), 400);
     }
 
+    // NUEVO MOTOR DE BÚSQUEDA NATIVO (Sin rs2json)
     async function fetchNewsForState(estadoNombre) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando radar para ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando radar en tiempo real para ${estadoNombre}...</p>`;
 
-        // Motores de búsqueda simplificados para evitar colapso del RSS
         let searchTerms = "";
         let tagHtml = "";
         let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
         let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
 
         if (currentMode === 'tactico') {
-            // Búsqueda lineal simplificada
-            searchTerms = `${estadoNombre} carretera bloqueos OR accidentes OR trafico OR cierre`;
+            searchTerms = `${estadoNombre} carretera OR trafico OR accidente OR bloqueo`;
             tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
         } else {
-            // Búsqueda lineal simplificada
-            searchTerms = `${estadoNombre} infraestructura OR inversion OR construccion OR proyectos`;
+            searchTerms = `${estadoNombre} infraestructura OR inversion OR construccion`;
             tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
         }
         
         const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419`;
-        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        
+        // Usamos un proxy CORS abierto para saltar restricciones del navegador, leyendo el XML puro
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
 
         try {
-            const res = await fetch(apiUrl);
+            const res = await fetch(proxyUrl);
             const dataResponse = await res.json();
 
-            if (dataResponse.status === "ok" && dataResponse.items.length > 0) {
-                const sortedItems = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+            // Magia JS: Traducir el XML crudo sin depender de servidores externos
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(dataResponse.contents, "text/xml");
+            const items = Array.from(xmlDoc.querySelectorAll("item"));
+
+            if (items.length > 0) {
+                // Mapear los datos del XML a un arreglo ordenable
+                let newsArray = items.map(item => ({
+                    title: item.querySelector("title").textContent,
+                    link: item.querySelector("link").textContent,
+                    pubDate: new Date(item.querySelector("pubDate").textContent)
+                }));
+
+                // Ordenar cronológicamente (Más reciente primero)
+                newsArray.sort((a, b) => b.pubDate - a.pubDate);
                 
-                contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => {
-                    const dateStr = new Date(item.pubDate).toLocaleString('es-MX', {
+                contentDiv.innerHTML = newsArray.slice(0, 15).map(item => {
+                    const dateStr = item.pubDate.toLocaleString('es-MX', {
                         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                     });
                     return `
@@ -254,19 +261,15 @@
                     `;
                 }).join('');
             } else {
-                const emptyMsg = currentMode === 'tactico' 
-                    ? `No hay disrupciones carreteras recientes reportadas en ${estadoNombre}.`
-                    : `No se encontraron reportes recientes de construcción o inversión en ${estadoNombre}.`;
-                
                 contentDiv.innerHTML = `
                     <div style="text-align:center; padding: 20px;">
                         <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
-                        <p style="color:#7f8c8d;">${emptyMsg}</p>
+                        <p style="color:#7f8c8d;">Radar despejado. No se encontraron reportes en las últimas horas.</p>
                     </div>`;
             }
         } catch (err) {
             console.error("Error al extraer alertas:", err);
-            contentDiv.innerHTML = "<p>Error de conexión al procesar la información.</p>";
+            contentDiv.innerHTML = "<p style='color:#e74c3c; text-align:center;'>Error de conexión al procesar la información de Google News.</p>";
         }
     }
 

@@ -6,7 +6,6 @@
     <title>Control Tower MX - S&OP y Riesgos</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
-        /* Ajuste Global para evitar desbordamientos */
         *, *::before, *::after {
             box-sizing: border-box;
         }
@@ -21,7 +20,7 @@
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            overflow: hidden; /* Congela la pantalla principal */
+            overflow: hidden; 
             background-color: #ffffff;
         }
 
@@ -41,7 +40,7 @@
             justify-content: center;
             background-color: #e5f1f6; 
             transition: all 0.4s ease-in-out;
-            min-width: 0; /* OBLIGA AL MAPA A ENCOGERSE */
+            min-width: 0; 
             overflow: hidden;
         }
 
@@ -71,7 +70,6 @@
         .mode-btn.active-tactico { background: var(--tactico); color: white; }
         .mode-btn.active-estrategico { background: var(--estrategico); color: white; }
 
-        /* Estructura del Panel de Noticias corregida */
         #news-panel {
             flex: 0 0 0%; 
             width: 0%;
@@ -81,22 +79,20 @@
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             overflow-y: auto; 
             overflow-x: hidden;
-            min-width: 0; /* Previene desbordamiento horizontal */
-            opacity: 0; /* Oculto por defecto */
+            min-width: 0; 
+            opacity: 0; 
         }
 
-        /* Cuando se activa la vista dividida */
         .split-view #map-wrapper { 
-            flex: 0 0 65%; /* El mapa toma 65% */
+            flex: 0 0 65%; 
         }
         .split-view #news-panel { 
-            flex: 0 0 35%; /* Las noticias toman 35% */
+            flex: 0 0 35%; 
             width: 35%; 
             padding: 20px; 
-            opacity: 1; /* Se vuelve visible */
+            opacity: 1; 
         }
 
-        /* Tarjetas de noticias ajustadas para no salirse de los márgenes */
         .news-card {
             background: white; 
             border-radius: 8px; 
@@ -104,7 +100,7 @@
             margin-bottom: 15px; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             transition: border-left 0.3s;
-            word-wrap: break-word; /* Evita que links largos rompan la caja */
+            word-wrap: break-word; 
         }
 
         .card-tactico { border-left: 5px solid var(--tactico); }
@@ -143,7 +139,8 @@
 <script>
     const stateNames = {
         'MX-AGU': 'Aguascalientes', 'MX-BCN': 'Baja California', 'MX-BCS': 'Baja California Sur',
-        'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 'MX-CMX': 'Ciudad de México',
+        'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 
+        'MX-DIF': 'Ciudad de México', /* CORRECCIÓN APLICADA AQUÍ (DIF en lugar de CMX) */
         'MX-COA': 'Coahuila', 'MX-COL': 'Colima', 'MX-DUR': 'Durango', 'MX-GRO': 'Guerrero',
         'MX-GUA': 'Guanajuato', 'MX-HID': 'Hidalgo', 'MX-JAL': 'Jalisco', 'MX-MEX': 'Estado de México',
         'MX-MIC': 'Michoacán', 'MX-MOR': 'Morelos', 'MX-NAY': 'Nayarit', 'MX-NLE': 'Nuevo León',
@@ -164,7 +161,8 @@
         data = google.visualization.arrayToDataTable([
             ['Estado', 'Monitoreo'],
             ['MX-AGU', 0], ['MX-BCN', 0], ['MX-BCS', 0], ['MX-CAM', 0], ['MX-CHP', 0],
-            ['MX-CHH', 0], ['MX-CMX', 0], ['MX-COA', 0], ['MX-COL', 0], ['MX-DUR', 0],
+            ['MX-CHH', 0], ['MX-DIF', 0], /* CORRECCIÓN APLICADA AQUÍ TAMBIÉN */
+            ['MX-COA', 0], ['MX-COL', 0], ['MX-DUR', 0],
             ['MX-GRO', 0], ['MX-GUA', 0], ['MX-HID', 0], ['MX-JAL', 0], ['MX-MEX', 0],
             ['MX-MIC', 0], ['MX-MOR', 0], ['MX-NAY', 0], ['MX-NLE', 0], ['MX-OAX', 0],
             ['MX-PUE', 0], ['MX-QUE', 0], ['MX-ROO', 0], ['MX-SLP', 0], ['MX-SIN', 0],
@@ -228,8 +226,6 @@
         
         container.classList.add('split-view');
         
-        // El retraso permite que la transición CSS de Flexbox termine antes de redibujar el mapa,
-        // asegurando que encaje perfectamente en su nuevo espacio del 65%.
         setTimeout(() => drawMapWithCurrentMode(), 400); 
         
         fetchNewsForState(estadoNombre);
@@ -298,7 +294,6 @@
         }
     }
 
-    // Redibujar mapa si cambias el tamaño de la ventana
     window.addEventListener('resize', () => {
         if(chart && data && options) chart.draw(data, options);
     });

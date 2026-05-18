@@ -82,6 +82,18 @@
             display: inline-block; padding: 3px 8px; background: #eee;
             border-radius: 4px; font-size: 10px; color: #555; margin-right: 5px; font-weight: bold;
         }
+
+        /* Estilo para la caja de diagnóstico */
+        .error-box {
+            background-color: #fee;
+            border: 2px solid #e74c3c;
+            color: #c0392b;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -203,36 +215,60 @@
         setTimeout(() => drawMapWithCurrentMode(), 400);
     }
 
+    // MOTOR NUEVO Y DIAGNÓSTICO
     async function fetchNewsForState(estadoNombre) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Cargando información para ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; font-weight:bold; color:#2c3e50;">Estableciendo conexión segura...</p>`;
 
-        let searchTerms = "";
-        let tagHtml = "";
+        let searchTerms = currentMode === 'tactico' 
+            ? `${estadoNombre} carreteras trafico accidente` 
+            : `${estadoNombre} construccion obras inversion`;
+
+        let tagHtml = currentMode === 'tactico' 
+            ? `<span class="tag">Logística</span>` 
+            : `<span class="tag">Desarrollo</span>`;
+            
         let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
         let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
 
-        // BÚSQUEDA MINIMALISTA Y DIRECTA
-        if (currentMode === 'tactico') {
-            searchTerms = estadoNombre + " carreteras trafico";
-            tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
-        } else {
-            searchTerms = estadoNombre + " construccion obras";
-            tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
-        }
+        // 1. Evitamos el caché con un timestamp
+        const cacheBuster = new Date().getTime();
         
-        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419`;
-        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+        // 2. URL pura de Google News
+        const googleUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419&cb=${cacheBuster}`;
+        
+        // 3. Usamos un puente nuevo (corsproxy) en lugar de rss2json
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(googleUrl)}`;
 
         try {
-            const res = await fetch(apiUrl);
-            const dataResponse = await res.json();
+            const response = await fetch(proxyUrl);
+            
+            // Si el servidor falla, tiramos un error a propósito para atraparlo en el catch
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+            }
 
-            if (dataResponse.status === "ok" && dataResponse.items.length > 0) {
-                const sortedItems = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-                
-                contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => {
-                    const dateObj = new Date(item.pubDate);
+            const textData = await response.text();
+
+            // Parsemos el XML manualmente
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(textData, "text/xml");
+            
+            // Verificamos si el XML nos arrojó un error de parseo (típico si nos bloquean y mandan HTML)
+            const parseError = xmlDoc.getElementsByTagName("parsererror");
+            if (parseError.length > 0) {
+                throw new Error("El servidor devolvió un formato no válido (posible bloqueo). Contenido recibido: " + textData.substring(0, 100) + "...");
+            }
+
+            const items = Array.from(xmlDoc.querySelectorAll("item"));
+
+            if (items.length > 0) {
+                let html = items.slice(0, 15).map(item => {
+                    const title = item.querySelector("title")?.textContent || "Sin título";
+                    const link = item.querySelector("link")?.textContent || "#";
+                    const pubDateRaw = item.querySelector("pubDate")?.textContent;
+                    
+                    const dateObj = new Date(pubDateRaw);
                     const dateStr = !isNaN(dateObj) ? dateObj.toLocaleString('es-MX', {
                         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                     }) : 'Reciente';
@@ -240,22 +276,30 @@
                     return `
                         <div class="news-card ${cardClass}">
                             <div class="news-date">🗓️ ${dateStr}</div>
-                            <h3>${item.title}</h3>
+                            <h3>${title}</h3>
                             <div style="margin-bottom: 8px;">${tagHtml}</div>
-                            <a class="news-link" href="${item.link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
+                            <a class="news-link" href="${link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
                         </div>
                     `;
                 }).join('');
+                contentDiv.innerHTML = html;
             } else {
                 contentDiv.innerHTML = `
                     <div style="text-align:center; padding: 20px;">
                         <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
-                        <p style="color:#7f8c8d;">No hay reportes recientes con este criterio en ${estadoNombre}.</p>
+                        <p style="color:#7f8c8d;">Google News no devolvió resultados para: "${searchTerms}"</p>
                     </div>`;
             }
         } catch (err) {
-            console.error("Error al extraer alertas:", err);
-            contentDiv.innerHTML = "<p style='color:#e74c3c; text-align:center;'>Error de conexión al obtener los datos.</p>";
+            // AQUÍ ESTÁ EL DIAGNÓSTICO
+            console.error("Falla detectada:", err);
+            contentDiv.innerHTML = `
+                <div class="error-box">
+                    <strong>¡Falla de Conexión Detectada!</strong><br><br>
+                    Por favor, copia este texto y dáselo a la IA para saber qué pasa:<br><br>
+                    <i>${err.message}</i><br><br>
+                    URL intentada: <br><span style="font-size:10px;">${proxyUrl}</span>
+                </div>`;
         }
     }
 

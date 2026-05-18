@@ -169,7 +169,6 @@
 
     function switchMode(mode) {
         currentMode = mode;
-        
         document.getElementById('btn-tactico').classList.remove('active-tactico');
         document.getElementById('btn-estrategico').classList.remove('active-estrategico');
         
@@ -204,72 +203,91 @@
         setTimeout(() => drawMapWithCurrentMode(), 400);
     }
 
-    // NUEVO MOTOR DE BÚSQUEDA NATIVO (Sin rs2json)
+    // MOTOR BLINDADO CON TRIPLE RESPALDO (Anti-Bloqueos)
     async function fetchNewsForState(estadoNombre) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando radar en tiempo real para ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Analizando telemetría y enrutando peticiones para ${estadoNombre}...</p>`;
 
-        let searchTerms = "";
-        let tagHtml = "";
-        let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
-        let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
+        // Simplificación de términos para asegurar resultados de Google
+        const searchTerms = currentMode === 'tactico' 
+            ? `${estadoNombre} accidente OR bloqueo OR trafico` 
+            : `${estadoNombre} construccion OR inversion OR infraestructura`;
 
-        if (currentMode === 'tactico') {
-            searchTerms = `${estadoNombre} carretera OR trafico OR accidente OR bloqueo`;
-            tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
-        } else {
-            searchTerms = `${estadoNombre} infraestructura OR inversion OR construccion`;
-            tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
-        }
-        
+        const tagHtml = currentMode === 'tactico' 
+            ? `<span class="tag">Logística</span><span class="tag">Ruta</span>` 
+            : `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
+            
+        const cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
+        const linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
+
         const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419`;
         
-        // Usamos un proxy CORS abierto para saltar restricciones del navegador, leyendo el XML puro
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+        // Túneles de conexión. Si uno falla, el código salta al siguiente.
+        const proxies = [
+            `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`
+        ];
 
-        try {
-            const res = await fetch(proxyUrl);
-            const dataResponse = await res.json();
+        let newsItems = [];
 
-            // Magia JS: Traducir el XML crudo sin depender de servidores externos
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(dataResponse.contents, "text/xml");
-            const items = Array.from(xmlDoc.querySelectorAll("item"));
+        for (let proxy of proxies) {
+            try {
+                const res = await fetch(proxy);
+                if (!res.ok) continue;
 
-            if (items.length > 0) {
-                // Mapear los datos del XML a un arreglo ordenable
-                let newsArray = items.map(item => ({
-                    title: item.querySelector("title").textContent,
-                    link: item.querySelector("link").textContent,
-                    pubDate: new Date(item.querySelector("pubDate").textContent)
-                }));
-
-                // Ordenar cronológicamente (Más reciente primero)
-                newsArray.sort((a, b) => b.pubDate - a.pubDate);
-                
-                contentDiv.innerHTML = newsArray.slice(0, 15).map(item => {
-                    const dateStr = item.pubDate.toLocaleString('es-MX', {
-                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                    });
-                    return `
-                        <div class="news-card ${cardClass}">
-                            <div class="news-date">🗓️ ${dateStr}</div>
-                            <h3>${item.title}</h3>
-                            <div style="margin-bottom: 8px;">${tagHtml}</div>
-                            <a class="news-link" href="${item.link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                contentDiv.innerHTML = `
-                    <div style="text-align:center; padding: 20px;">
-                        <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
-                        <p style="color:#7f8c8d;">Radar despejado. No se encontraron reportes en las últimas horas.</p>
-                    </div>`;
+                if (proxy.includes("rss2json")) {
+                    const data = await res.json();
+                    if (data.status === "ok" && data.items.length > 0) {
+                        newsItems = data.items;
+                        break; // Éxito, detenemos el ciclo
+                    }
+                } else {
+                    // Procesar XML crudo si usamos Codetabs o AllOrigins
+                    const text = await res.text();
+                    const parser = new DOMParser();
+                    const xml = parser.parseFromString(text, "text/xml");
+                    const items = Array.from(xml.querySelectorAll("item"));
+                    
+                    if (items.length > 0) {
+                        newsItems = items.map(item => ({
+                            title: item.querySelector("title")?.textContent || "Sin título",
+                            link: item.querySelector("link")?.textContent || "#",
+                            pubDate: item.querySelector("pubDate")?.textContent || new Date().toISOString()
+                        }));
+                        break; // Éxito, detenemos el ciclo
+                    }
+                }
+            } catch (err) {
+                console.warn("Túnel bloqueado o fallido, saltando al siguiente...", err);
             }
-        } catch (err) {
-            console.error("Error al extraer alertas:", err);
-            contentDiv.innerHTML = "<p style='color:#e74c3c; text-align:center;'>Error de conexión al procesar la información de Google News.</p>";
+        }
+
+        if (newsItems.length > 0) {
+            // Ordenar por fecha estricta
+            newsItems.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+            
+            contentDiv.innerHTML = newsItems.slice(0, 15).map(item => {
+                const dateObj = new Date(item.pubDate);
+                const dateStr = !isNaN(dateObj) ? dateObj.toLocaleString('es-MX', {
+                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                }) : 'Reciente';
+
+                return `
+                    <div class="news-card ${cardClass}">
+                        <div class="news-date">🗓️ ${dateStr}</div>
+                        <h3>${item.title}</h3>
+                        <div style="margin-bottom: 8px;">${tagHtml}</div>
+                        <a class="news-link" href="${item.link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            contentDiv.innerHTML = `
+                <div style="text-align:center; padding: 20px;">
+                    <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
+                    <p style="color:#7f8c8d;">Radar despejado o conexión completamente bloqueada por firewall local.</p>
+                </div>`;
         }
     }
 

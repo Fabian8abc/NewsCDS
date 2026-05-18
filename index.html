@@ -6,6 +6,11 @@
     <title>Control Tower MX - S&OP y Riesgos</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
+        /* Ajuste Global para evitar desbordamientos */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         :root {
             --tactico: #e74c3c;
             --estrategico: #2980b9;
@@ -16,22 +21,33 @@
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            overflow: hidden; background-color: #ffffff;
+            overflow: hidden; /* Congela la pantalla principal */
+            background-color: #ffffff;
         }
 
         #app-container {
-            display: flex; width: 100vw; height: 100vh;
+            display: flex; 
+            width: 100%; 
+            height: 100%;
+            overflow: hidden;
         }
 
         #map-wrapper {
-            flex: 1; height: 100%; position: relative;
-            display: flex; align-items: center; justify-content: center;
+            flex: 1; 
+            height: 100%; 
+            position: relative;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
             background-color: #e5f1f6; 
             transition: all 0.4s ease-in-out;
+            min-width: 0; /* OBLIGA AL MAPA A ENCOGERSE */
+            overflow: hidden;
         }
 
         #regions_div {
-            width: 100%; height: 100%;
+            width: 100%; 
+            height: 100%;
         }
 
         .mode-selector {
@@ -55,20 +71,40 @@
         .mode-btn.active-tactico { background: var(--tactico); color: white; }
         .mode-btn.active-estrategico { background: var(--estrategico); color: white; }
 
+        /* Estructura del Panel de Noticias corregida */
         #news-panel {
-            width: 0%; height: 100%; background: var(--bg-light);
+            flex: 0 0 0%; 
+            width: 0%;
+            height: 100%; 
+            background: var(--bg-light);
             border-left: 1px solid #ddd;
-            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow-y: auto; box-sizing: border-box;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto; 
+            overflow-x: hidden;
+            min-width: 0; /* Previene desbordamiento horizontal */
+            opacity: 0; /* Oculto por defecto */
         }
 
-        .split-view #news-panel { width: 40%; padding: 20px; }
-        .split-view #map-wrapper { flex: 0 0 60%; }
+        /* Cuando se activa la vista dividida */
+        .split-view #map-wrapper { 
+            flex: 0 0 65%; /* El mapa toma 65% */
+        }
+        .split-view #news-panel { 
+            flex: 0 0 35%; /* Las noticias toman 35% */
+            width: 35%; 
+            padding: 20px; 
+            opacity: 1; /* Se vuelve visible */
+        }
 
+        /* Tarjetas de noticias ajustadas para no salirse de los márgenes */
         .news-card {
-            background: white; border-radius: 8px; padding: 15px;
-            margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            background: white; 
+            border-radius: 8px; 
+            padding: 15px;
+            margin-bottom: 15px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             transition: border-left 0.3s;
+            word-wrap: break-word; /* Evita que links largos rompan la caja */
         }
 
         .card-tactico { border-left: 5px solid var(--tactico); }
@@ -191,6 +227,9 @@
         document.getElementById('panel-title').innerText = `${titlePrefix} ${estadoNombre}`;
         
         container.classList.add('split-view');
+        
+        // El retraso permite que la transición CSS de Flexbox termine antes de redibujar el mapa,
+        // asegurando que encaje perfectamente en su nuevo espacio del 65%.
         setTimeout(() => drawMapWithCurrentMode(), 400); 
         
         fetchNewsForState(estadoNombre);
@@ -203,17 +242,15 @@
         setTimeout(() => drawMapWithCurrentMode(), 400);
     }
 
-    // REGRESAMOS AL MOTOR ORIGINAL QUE FUNCIONABA, PERO CON CACHE BUSTER
     async function fetchNewsForState(estadoNombre) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p style="text-align:center; color:#666;">Cargando información para ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; color:#666; margin-top: 50px;">Buscando información para ${estadoNombre}...</p>`;
 
         let searchTerms = "";
         let tagHtml = "";
         let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
         let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
 
-        // Búsqueda simplificada y segura para no romper el convertidor
         if (currentMode === 'tactico') {
             searchTerms = estadoNombre + " bloqueos OR trafico OR accidentes";
             tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
@@ -222,12 +259,8 @@
             tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
         }
         
-        // EL TRUCO: Agregamos un timestamp dinámico (_t) al final para engañar a rss2json
-        // y obligarlo a que no use su memoria caché guardada.
         const cacheBuster = new Date().getTime();
         const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419&_t=${cacheBuster}`;
-        
-        // Llamada a rss2json (el servicio original que sí funcionaba)
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 
         try {
@@ -254,17 +287,18 @@
                 }).join('');
             } else {
                 contentDiv.innerHTML = `
-                    <div style="text-align:center; padding: 20px;">
+                    <div style="text-align:center; padding: 20px; margin-top: 40px;">
                         <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
                         <p style="color:#7f8c8d;">No se encontraron reportes recientes de este tipo para ${estadoNombre}.</p>
                     </div>`;
             }
         } catch (err) {
             console.error("Error en la extracción de noticias:", err);
-            contentDiv.innerHTML = `<p style='color:#e74c3c; text-align:center;'>No se pudo conectar al servidor de noticias.</p>`;
+            contentDiv.innerHTML = `<p style='color:#e74c3c; text-align:center; margin-top: 50px;'>No se pudo conectar al servidor de noticias.</p>`;
         }
     }
 
+    // Redibujar mapa si cambias el tamaño de la ventana
     window.addEventListener('resize', () => {
         if(chart && data && options) chart.draw(data, options);
     });

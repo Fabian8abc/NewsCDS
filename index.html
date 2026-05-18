@@ -140,7 +140,7 @@
     const stateNames = {
         'MX-AGU': 'Aguascalientes', 'MX-BCN': 'Baja California', 'MX-BCS': 'Baja California Sur',
         'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 
-        'MX-DIF': 'Ciudad de México', /* CORRECCIÓN APLICADA AQUÍ (DIF en lugar de CMX) */
+        'MX-DIF': 'Ciudad de México', 
         'MX-COA': 'Coahuila', 'MX-COL': 'Colima', 'MX-DUR': 'Durango', 'MX-GRO': 'Guerrero',
         'MX-GUA': 'Guanajuato', 'MX-HID': 'Hidalgo', 'MX-JAL': 'Jalisco', 'MX-MEX': 'Estado de México',
         'MX-MIC': 'Michoacán', 'MX-MOR': 'Morelos', 'MX-NAY': 'Nayarit', 'MX-NLE': 'Nuevo León',
@@ -161,7 +161,7 @@
         data = google.visualization.arrayToDataTable([
             ['Estado', 'Monitoreo'],
             ['MX-AGU', 0], ['MX-BCN', 0], ['MX-BCS', 0], ['MX-CAM', 0], ['MX-CHP', 0],
-            ['MX-CHH', 0], ['MX-DIF', 0], /* CORRECCIÓN APLICADA AQUÍ TAMBIÉN */
+            ['MX-CHH', 0], ['MX-DIF', 0], 
             ['MX-COA', 0], ['MX-COL', 0], ['MX-DUR', 0],
             ['MX-GRO', 0], ['MX-GUA', 0], ['MX-HID', 0], ['MX-JAL', 0], ['MX-MEX', 0],
             ['MX-MIC', 0], ['MX-MOR', 0], ['MX-NAY', 0], ['MX-NLE', 0], ['MX-OAX', 0],
@@ -201,6 +201,7 @@
         if(chart && data) chart.draw(data, options);
     }
 
+    // Cambiar entre Táctico y Estratégico
     function switchMode(mode) {
         currentMode = mode;
         document.getElementById('btn-tactico').classList.remove('active-tactico');
@@ -247,11 +248,12 @@
         let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
         let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
 
+        // INTEGRACIÓN DE LA PALABRA CLAVE "ADUANA"
         if (currentMode === 'tactico') {
-            searchTerms = estadoNombre + " bloqueos OR trafico OR accidentes";
+            searchTerms = estadoNombre + " bloqueos OR trafico OR aduana";
             tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
         } else {
-            searchTerms = estadoNombre + " construccion OR inversion OR obras";
+            searchTerms = estadoNombre + " construccion OR inversion OR aduana";
             tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
         }
         

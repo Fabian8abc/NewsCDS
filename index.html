@@ -93,6 +93,47 @@
             opacity: 1; 
         }
 
+        /* Controles de Interfaz Nuevos */
+        .panel-controls {
+            background: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            outline: none;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 5px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: bold;
+            background: #eee;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #555;
+        }
+
+        .tab-btn.active {
+            background: #2c3e50;
+            color: white;
+        }
+
         .news-card {
             background: white; 
             border-radius: 8px; 
@@ -108,7 +149,30 @@
 
         .news-card h3 { margin: 0 0 8px 0; font-size: 14px; line-height: 1.4; color: var(--text-dark); }
         .news-date { font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 5px; }
+        
+        .card-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #eee;
+        }
+
         .news-link { font-size: 12px; text-decoration: none; font-weight: bold; }
+        
+        .share-btn {
+            background: none;
+            border: none;
+            color: #7f8c8d;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .share-btn:hover { color: #2c3e50; }
         
         .tag {
             display: inline-block; padding: 3px 8px; background: #eee;
@@ -128,10 +192,20 @@
     </div>
     
     <div id="news-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-            <h2 id="panel-title" style="margin:0; font-size: 1.4rem; color: var(--text-dark);">Monitoreo</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <h2 id="panel-title" style="margin:0; font-size: 1.3rem; color: var(--text-dark);">Monitoreo</h2>
             <button onclick="cerrarPanel()" style="border:none; background:none; font-size:28px; cursor:pointer; color:#888;">&times;</button>
         </div>
+
+        <div class="panel-controls">
+            <input type="text" id="panel-search" class="search-input" placeholder="🔍 Filtrar palabras clave (ej. aduana, cierre)..." oninput="filtrarPantalla()">
+            <div class="filter-tabs">
+                <button id="time-all" class="tab-btn active" onclick="cambiarFiltroTiempo('all')">Todo</button>
+                <button id="time-24" class="tab-btn" onclick="cambiarFiltroTiempo(24)">Últimas 24h</button>
+                <button id="time-48" class="tab-btn" onclick="cambiarFiltroTiempo(48)">Últimas 48h</button>
+            </div>
+        </div>
+
         <div id="news-content"></div>
     </div>
 </div>
@@ -139,8 +213,7 @@
 <script>
     const stateNames = {
         'MX-AGU': 'Aguascalientes', 'MX-BCN': 'Baja California', 'MX-BCS': 'Baja California Sur',
-        'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 
-        'MX-DIF': 'Ciudad de México', 
+        'MX-CAM': 'Campeche', 'MX-CHP': 'Chiapas', 'MX-CHH': 'Chihuahua', 'MX-DIF': 'Ciudad de México', 
         'MX-COA': 'Coahuila', 'MX-COL': 'Colima', 'MX-DUR': 'Durango', 'MX-GRO': 'Guerrero',
         'MX-GUA': 'Guanajuato', 'MX-HID': 'Hidalgo', 'MX-JAL': 'Jalisco', 'MX-MEX': 'Estado de México',
         'MX-MIC': 'Michoacán', 'MX-MOR': 'Morelos', 'MX-NAY': 'Nayarit', 'MX-NLE': 'Nuevo León',
@@ -153,6 +226,8 @@
     let chart, data, options;
     let currentMode = 'tactico'; 
     let currentStateSelected = null;
+    let cacheNoticiasActuales = []; // Guarda las notas en memoria para los filtros rápidos
+    let filtroTiempoActual = 'all';
 
     google.charts.load('current', {'packages':['geochart']});
     google.charts.setOnLoadCallback(initMap);
@@ -201,7 +276,6 @@
         if(chart && data) chart.draw(data, options);
     }
 
-    // Cambiar entre Táctico y Estratégico
     function switchMode(mode) {
         currentMode = mode;
         document.getElementById('btn-tactico').classList.remove('active-tactico');
@@ -225,8 +299,12 @@
         const titlePrefix = currentMode === 'tactico' ? 'Riesgos Viales en' : 'Proyectos en';
         document.getElementById('panel-title').innerText = `${titlePrefix} ${estadoNombre}`;
         
+        // Limpiar controles al cambiar de estado
+        document.getElementById('panel-search').value = '';
+        filtroTiempoActual = 'all';
+        actualizarEstiloTabs();
+
         container.classList.add('split-view');
-        
         setTimeout(() => drawMapWithCurrentMode(), 400); 
         
         fetchNewsForState(estadoNombre);
@@ -244,17 +322,10 @@
         contentDiv.innerHTML = `<p style="text-align:center; color:#666; margin-top: 50px;">Buscando información para ${estadoNombre}...</p>`;
 
         let searchTerms = "";
-        let tagHtml = "";
-        let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
-        let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
-
-        // INTEGRACIÓN DE LA PALABRA CLAVE "ADUANA"
         if (currentMode === 'tactico') {
             searchTerms = estadoNombre + " bloqueos OR trafico OR aduana";
-            tagHtml = `<span class="tag">Logística</span><span class="tag">Ruta</span>`;
         } else {
             searchTerms = estadoNombre + " construccion OR inversion OR aduana";
-            tagHtml = `<span class="tag">Desarrollo</span><span class="tag">Inversión</span>`;
         }
         
         const cacheBuster = new Date().getTime();
@@ -266,24 +337,11 @@
             const dataResponse = await res.json();
 
             if (dataResponse.status === "ok" && dataResponse.items.length > 0) {
-                const sortedItems = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-                
-                contentDiv.innerHTML = sortedItems.slice(0, 15).map(item => {
-                    const dateObj = new Date(item.pubDate);
-                    const dateStr = !isNaN(dateObj) ? dateObj.toLocaleString('es-MX', {
-                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                    }) : 'Reciente';
-
-                    return `
-                        <div class="news-card ${cardClass}">
-                            <div class="news-date">🗓️ ${dateStr}</div>
-                            <h3>${item.title}</h3>
-                            <div style="margin-bottom: 8px;">${tagHtml}</div>
-                            <a class="news-link" href="${item.link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
-                        </div>
-                    `;
-                }).join('');
+                // Almacenamos el resultado crudo en el caché para la manipulación en pantalla
+                cacheNoticiasActuales = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+                renderizarNoticiasFiltradas();
             } else {
+                cacheNoticiasActuales = [];
                 contentDiv.innerHTML = `
                     <div style="text-align:center; padding: 20px; margin-top: 40px;">
                         <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
@@ -294,6 +352,99 @@
             console.error("Error en la extracción de noticias:", err);
             contentDiv.innerHTML = `<p style='color:#e74c3c; text-align:center; margin-top: 50px;'>No se pudo conectar al servidor de noticias.</p>`;
         }
+    }
+
+    // NUEVO MOTOR DE FILTRADO LOCAL (Filtra por tiempo y texto simultáneamente)
+    function renderizarNoticiasFiltradas() {
+        const contentDiv = document.getElementById('news-content');
+        const textoBusqueda = document.getElementById('panel-search').value.toLowerCase();
+        
+        let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
+        let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
+        let tagHtml = currentMode === 'tactico' ? `<span class="tag">Logística</span>` : `<span class="tag">Desarrollo</span>`;
+
+        const ahora = new Date();
+
+        // Aplicar filtros matemáticos sobre el arreglo en memoria
+        let notasFiltradas = cacheNoticiasActuales.filter(item => {
+            const fechaNota = new Date(item.pubDate);
+            const diferenciaHoras = (ahora - fechaNota) / (1000 * 60 * 60);
+            
+            // Filtro de tiempo
+            if (filtroTiempoActual !== 'all' && diferenciaHoras > filtroTiempoActual) {
+                return false;
+            }
+            
+            // Filtro de texto
+            if (textoBusqueda && !item.title.toLowerCase().includes(textoBusqueda)) {
+                return false;
+            }
+            
+            return true;
+        });
+
+        if (notasFiltradas.length > 0) {
+            contentDiv.innerHTML = notasFiltradas.map((item, index) => {
+                const dateObj = new Date(item.pubDate);
+                const dateStr = !isNaN(dateObj) ? dateObj.toLocaleString('es-MX', {
+                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                }) : 'Reciente';
+
+                // Escapar comillas para evitar errores en el string de JavaScript al compartir
+                const tituloEscapado = item.title.replace(/'/g, "\\'").replace(/"/g, '\\"');
+
+                return `
+                    <div class="news-card ${cardClass}">
+                        <div class="news-date">🗓️ ${dateStr}</div>
+                        <h3>${item.title}</h3>
+                        <div style="margin-bottom: 5px;">${tagHtml}</div>
+                        <div class="card-actions">
+                            <a class="news-link" href="${item.link}" target="_blank" style="color:${linkColor}">LEER REPORTE ➜</a>
+                            <button class="share-btn" onclick="compartirAlerta('${currentMode.toUpperCase()}', '${currentStateSelected}', '${tituloEscapado}', '${item.link}')">
+                                📋 Copiar Alerta
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            contentDiv.innerHTML = `<p style="text-align:center; color:#7f8c8d; margin-top: 40px; font-size:13px;">Ninguna noticia coincide con los filtros seleccionados.</p>`;
+        }
+    }
+
+    // Funciones activadas por los botones de la UI
+    function filtrarPantalla() {
+        renderizarNoticiasFiltradas();
+    }
+
+    function cambiarFiltroTiempo(horas) {
+        filtroTiempoActual = horas;
+        actualizarEstiloTabs();
+        renderizarNoticiasFiltradas();
+    }
+
+    function actualizarEstiloTabs() {
+        document.getElementById('time-all').classList.remove('active');
+        document.getElementById('time-24').classList.remove('active');
+        document.getElementById('time-48').classList.remove('active');
+
+        if (filtroTiempoActual === 'all') document.getElementById('time-all').classList.add('active');
+        if (filtroTiempoActual === 24) document.getElementById('time-24').classList.add('active');
+        if (filtroTiempoActual === 48) document.getElementById('time-48').classList.add('active');
+    }
+
+    // FUNCIÓN DE EXPORTACIÓN AUTOMATIZADA
+    function compartirAlerta(modo, estado, titulo, link) {
+        const emoji = modo === 'TACTICO' ? '⚠️' : '🏗️';
+        const encabezado = modo === 'TACTICO' ? 'ALERTA LOGÍSTICA' : 'REPORTE DE DEMANDA';
+        
+        const textoFinal = `${emoji} *[${encabezado} - ${estado.toUpperCase()}]*\n\n${titulo}\n\n🔗 Ver reporte completo: ${link}`;
+        
+        navigator.clipboard.writeText(textoFinal).then(() => {
+            alert(`🚨 Alerta de ${estado} copiada al portapapeles. Ya puedes pegarla en WhatsApp o Teams.`);
+        }).catch(err => {
+            console.error('No se pudo copiar el texto: ', err);
+        });
     }
 
     window.addEventListener('resize', () => {

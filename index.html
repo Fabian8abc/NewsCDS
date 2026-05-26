@@ -6,13 +6,12 @@
     <title>Control Tower MX - S&OP y Riesgos</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
-        *, *::before, *::after {
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { box-sizing: border-box; }
 
         :root {
             --tactico: #e74c3c;
             --estrategico: #2980b9;
+            --global: #16a085; /* Verde esmeralda para el modo internacional */
             --bg-light: #f4f7f6;
             --text-dark: #2c3e50;
         }
@@ -25,152 +24,121 @@
         }
 
         #app-container {
-            display: flex; 
-            width: 100%; 
-            height: 100%;
-            overflow: hidden;
+            display: flex; width: 100%; height: 100%; overflow: hidden;
         }
 
-        #map-wrapper {
-            flex: 1; 
-            height: 100%; 
-            position: relative;
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
+        /* Contenedor Izquierdo (Mapa o Buscador Global) */
+        #main-view-wrapper {
+            flex: 1; height: 100%; position: relative;
+            display: flex; align-items: center; justify-content: center;
             background-color: #e5f1f6; 
             transition: all 0.4s ease-in-out;
-            min-width: 0; 
-            overflow: hidden;
+            min-width: 0; overflow: hidden;
         }
 
-        #regions_div {
-            width: 100%; 
-            height: 100%;
+        #regions_div { width: 100%; height: 100%; }
+
+        /* Centro de Comando Global (Oculto por defecto) */
+        #global-commander {
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%; height: 100%; background: #ebf5f3; padding: 20px; text-align: center;
         }
 
+        #global-commander h1 { color: var(--text-dark); font-size: 2rem; margin-bottom: 10px; }
+        #global-commander p { color: #7f8c8d; margin-bottom: 30px; font-size: 1.1rem; }
+
+        .global-search-box {
+            display: flex; width: 60%; max-width: 600px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 50px; overflow: hidden; margin-bottom: 30px; background: white;
+        }
+
+        .global-search-box input {
+            flex: 1; border: none; padding: 15px 25px; font-size: 1.1rem; outline: none;
+        }
+
+        .global-search-box button {
+            background: var(--global); color: white; border: none; padding: 0 30px;
+            font-weight: bold; cursor: pointer; font-size: 1rem; transition: background 0.3s;
+        }
+        .global-search-box button:hover { background: #12876f; }
+
+        .global-shortcuts { display: flex; gap: 15px; }
+        .shortcut-btn {
+            background: white; border: 1px solid #ccc; padding: 10px 20px; border-radius: 50px;
+            cursor: pointer; font-weight: bold; color: var(--text-dark); transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .shortcut-btn:hover { border-color: var(--global); color: var(--global); transform: translateY(-2px); }
+
+        /* Selector de Modos */
         .mode-selector {
-            position: absolute;
-            top: 20px; left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            border-radius: 50px;
-            display: flex;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            overflow: hidden;
-            z-index: 10;
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: white; border-radius: 50px; display: flex;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); overflow: hidden; z-index: 10;
         }
 
         .mode-btn {
-            padding: 12px 24px; border: none; background: transparent;
-            font-weight: bold; font-size: 14px; cursor: pointer;
+            padding: 12px 20px; border: none; background: transparent;
+            font-weight: bold; font-size: 13px; cursor: pointer;
             transition: all 0.3s; color: #7f8c8d; outline: none;
         }
 
         .mode-btn.active-tactico { background: var(--tactico); color: white; }
         .mode-btn.active-estrategico { background: var(--estrategico); color: white; }
+        .mode-btn.active-global { background: var(--global); color: white; }
 
+        /* Panel Lateral */
         #news-panel {
-            flex: 0 0 0%; 
-            width: 0%;
-            height: 100%; 
-            background: var(--bg-light);
-            border-left: 1px solid #ddd;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow-y: auto; 
-            overflow-x: hidden;
-            min-width: 0; 
-            opacity: 0; 
+            flex: 0 0 0%; width: 0%; height: 100%; background: var(--bg-light);
+            border-left: 1px solid #ddd; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto; overflow-x: hidden; min-width: 0; opacity: 0; 
         }
 
-        .split-view #map-wrapper { 
-            flex: 0 0 65%; 
-        }
-        .split-view #news-panel { 
-            flex: 0 0 35%; 
-            width: 35%; 
-            padding: 20px; 
-            opacity: 1; 
-        }
+        .split-view #main-view-wrapper { flex: 0 0 65%; }
+        .split-view #news-panel { flex: 0 0 35%; width: 35%; padding: 20px; opacity: 1; }
 
-        /* Controles de Interfaz Nuevos */
+        /* Controles Internos del Panel */
         .panel-controls {
-            background: #fff;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            background: #fff; padding: 12px; border-radius: 8px;
+            margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
         .search-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 13px;
-            margin-bottom: 8px;
-            outline: none;
+            width: 100%; padding: 8px 12px; border: 1px solid #ccc;
+            border-radius: 4px; font-size: 13px; margin-bottom: 8px; outline: none;
         }
 
-        .filter-tabs {
-            display: flex;
-            gap: 5px;
-        }
-
+        .filter-tabs { display: flex; gap: 5px; }
         .tab-btn {
-            flex: 1;
-            padding: 5px 10px;
-            font-size: 11px;
-            font-weight: bold;
-            background: #eee;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #555;
+            flex: 1; padding: 5px 10px; font-size: 11px; font-weight: bold;
+            background: #eee; border: none; border-radius: 4px; cursor: pointer; color: #555;
         }
+        .tab-btn.active { background: #2c3e50; color: white; }
 
-        .tab-btn.active {
-            background: #2c3e50;
-            color: white;
-        }
-
+        /* Tarjetas de Noticias */
         .news-card {
-            background: white; 
-            border-radius: 8px; 
-            padding: 15px;
-            margin-bottom: 15px; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: border-left 0.3s;
-            word-wrap: break-word; 
+            background: white; border-radius: 8px; padding: 15px;
+            margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: border-left 0.3s; word-wrap: break-word; 
         }
 
         .card-tactico { border-left: 5px solid var(--tactico); }
         .card-estrategico { border-left: 5px solid var(--estrategico); }
+        .card-global { border-left: 5px solid var(--global); }
 
         .news-card h3 { margin: 0 0 8px 0; font-size: 14px; line-height: 1.4; color: var(--text-dark); }
         .news-date { font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 5px; }
         
         .card-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #eee;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 10px; padding-top: 10px; border-top: 1px dashed #eee;
         }
 
         .news-link { font-size: 12px; text-decoration: none; font-weight: bold; }
         
         .share-btn {
-            background: none;
-            border: none;
-            color: #7f8c8d;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            background: none; border: none; color: #7f8c8d; font-size: 11px;
+            font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;
         }
         .share-btn:hover { color: #2c3e50; }
         
@@ -183,12 +151,30 @@
 <body>
 
 <div id="app-container">
-    <div id="map-wrapper">
+    <div id="main-view-wrapper">
         <div class="mode-selector">
-            <button id="btn-tactico" class="mode-btn active-tactico" onclick="switchMode('tactico')">⚠️ Táctico: Riesgos en Ruta</button>
-            <button id="btn-estrategico" class="mode-btn" onclick="switchMode('estrategico')">🏗️ Estratégico: Obras y Demanda</button>
+            <button id="btn-tactico" class="mode-btn active-tactico" onclick="switchMode('tactico')">⚠️ Táctico Local</button>
+            <button id="btn-estrategico" class="mode-btn" onclick="switchMode('estrategico')">🏗️ Estratégico Local</button>
+            <button id="btn-global" class="mode-btn" onclick="switchMode('global')">🌐 Macro-Global</button>
         </div>
+        
         <div id="regions_div"></div>
+
+        <div id="global-commander">
+            <h1>Radar de Suministro Internacional</h1>
+            <p>Monitorea riesgos marítimos, aranceles y escasez que impactan a México.</p>
+            
+            <div class="global-search-box">
+                <input type="text" id="input-country" placeholder="Ingresa un país (Ej. Vietnam, India, Brazil)..." onkeypress="verificarEnter(event)">
+                <button onclick="ejecutarBusquedaGlobalInput()">RASTREAR</button>
+            </div>
+
+            <div class="global-shortcuts">
+                <button class="shortcut-btn" onclick="abrirPanelGlobal('United States')">🇺🇸 Estados Unidos</button>
+                <button class="shortcut-btn" onclick="abrirPanelGlobal('China')">🇨🇳 China / Taiwán</button>
+                <button class="shortcut-btn" onclick="abrirPanelGlobal('Germany')">🇩🇪 Alemania</button>
+            </div>
+        </div>
     </div>
     
     <div id="news-panel">
@@ -198,7 +184,7 @@
         </div>
 
         <div class="panel-controls">
-            <input type="text" id="panel-search" class="search-input" placeholder="🔍 Filtrar palabras clave (ej. aduana, cierre)..." oninput="filtrarPantalla()">
+            <input type="text" id="panel-search" class="search-input" placeholder="🔍 Filtrar resultados en pantalla..." oninput="filtrarPantalla()">
             <div class="filter-tabs">
                 <button id="time-all" class="tab-btn active" onclick="cambiarFiltroTiempo('all')">Todo</button>
                 <button id="time-24" class="tab-btn" onclick="cambiarFiltroTiempo(24)">Últimas 24h</button>
@@ -226,7 +212,7 @@
     let chart, data, options;
     let currentMode = 'tactico'; 
     let currentStateSelected = null;
-    let cacheNoticiasActuales = []; // Guarda las notas en memoria para los filtros rápidos
+    let cacheNoticiasActuales = []; 
     let filtroTiempoActual = 'all';
 
     google.charts.load('current', {'packages':['geochart']});
@@ -236,8 +222,7 @@
         data = google.visualization.arrayToDataTable([
             ['Estado', 'Monitoreo'],
             ['MX-AGU', 0], ['MX-BCN', 0], ['MX-BCS', 0], ['MX-CAM', 0], ['MX-CHP', 0],
-            ['MX-CHH', 0], ['MX-DIF', 0], 
-            ['MX-COA', 0], ['MX-COL', 0], ['MX-DUR', 0],
+            ['MX-CHH', 0], ['MX-DIF', 0], ['MX-COA', 0], ['MX-COL', 0], ['MX-DUR', 0],
             ['MX-GRO', 0], ['MX-GUA', 0], ['MX-HID', 0], ['MX-JAL', 0], ['MX-MEX', 0],
             ['MX-MIC', 0], ['MX-MOR', 0], ['MX-NAY', 0], ['MX-NLE', 0], ['MX-OAX', 0],
             ['MX-PUE', 0], ['MX-QUE', 0], ['MX-ROO', 0], ['MX-SLP', 0], ['MX-SIN', 0],
@@ -261,75 +246,106 @@
 
     function drawMapWithCurrentMode() {
         const mapColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9'; 
-        
         options = {
-            region: 'MX',
-            resolution: 'provinces',
-            colorAxis: {colors: [mapColor]}, 
-            backgroundColor: '#e5f1f6',
-            datalessRegionColor: '#f4f4f4',
-            defaultColor: mapColor,
-            tooltip: { trigger: 'focus' },
-            keepAspectRatio: true
+            region: 'MX', resolution: 'provinces', colorAxis: {colors: [mapColor]}, 
+            backgroundColor: '#e5f1f6', datalessRegionColor: '#f4f4f4',
+            defaultColor: mapColor, tooltip: { trigger: 'focus' }, keepAspectRatio: true
         };
-        
-        if(chart && data) chart.draw(data, options);
+        if(chart && data && currentMode !== 'global') chart.draw(data, options);
     }
 
+    // MANEJO DE LOS 3 MODOS (Muestra/Oculta el Mapa y el Buscador)
     function switchMode(mode) {
         currentMode = mode;
         document.getElementById('btn-tactico').classList.remove('active-tactico');
         document.getElementById('btn-estrategico').classList.remove('active-estrategico');
+        document.getElementById('btn-global').classList.remove('active-global');
         
-        if (mode === 'tactico') {
-            document.getElementById('btn-tactico').classList.add('active-tactico');
+        if (mode === 'tactico') document.getElementById('btn-tactico').classList.add('active-tactico');
+        if (mode === 'estrategico') document.getElementById('btn-estrategico').classList.add('active-estrategico');
+        if (mode === 'global') document.getElementById('btn-global').classList.add('active-global');
+
+        if (mode === 'global') {
+            document.getElementById('regions_div').style.display = 'none';
+            document.getElementById('global-commander').style.display = 'flex';
+            document.getElementById('main-view-wrapper').style.backgroundColor = '#ebf5f3';
+            cerrarPanel();
         } else {
-            document.getElementById('btn-estrategico').classList.add('active-estrategico');
-        }
-
-        drawMapWithCurrentMode();
-
-        if (currentStateSelected && document.getElementById('app-container').classList.contains('split-view')) {
-            abrirPanel(currentStateSelected);
+            document.getElementById('regions_div').style.display = 'block';
+            document.getElementById('global-commander').style.display = 'none';
+            document.getElementById('main-view-wrapper').style.backgroundColor = '#e5f1f6';
+            drawMapWithCurrentMode();
+            if (currentStateSelected && document.getElementById('app-container').classList.contains('split-view')) {
+                abrirPanel(currentStateSelected);
+            }
         }
     }
 
+    // ABRIR PANEL PARA MODOS NACIONALES (Mapa)
     function abrirPanel(estadoNombre) {
+        if(currentMode === 'global') return; // Seguridad
         const container = document.getElementById('app-container');
-        const titlePrefix = currentMode === 'tactico' ? 'Riesgos Viales en' : 'Proyectos en';
-        document.getElementById('panel-title').innerText = `${titlePrefix} ${estadoNombre}`;
-        
-        // Limpiar controles al cambiar de estado
-        document.getElementById('panel-search').value = '';
-        filtroTiempoActual = 'all';
-        actualizarEstiloTabs();
-
+        document.getElementById('panel-title').innerText = currentMode === 'tactico' ? `Riesgos en ${estadoNombre}` : `Proyectos en ${estadoNombre}`;
+        limpiarControles();
         container.classList.add('split-view');
         setTimeout(() => drawMapWithCurrentMode(), 400); 
-        
-        fetchNewsForState(estadoNombre);
+        fetchNews(estadoNombre, currentMode);
+    }
+
+    // ABRIR PANEL PARA MODO INTERNACIONAL
+    function abrirPanelGlobal(pais) {
+        currentStateSelected = pais;
+        const container = document.getElementById('app-container');
+        document.getElementById('panel-title').innerText = `Impacto S&OP: ${pais}`;
+        limpiarControles();
+        container.classList.add('split-view');
+        fetchNews(pais, 'global');
+    }
+
+    function verificarEnter(e) {
+        if (e.key === 'Enter') ejecutarBusquedaGlobalInput();
+    }
+
+    function ejecutarBusquedaGlobalInput() {
+        const pais = document.getElementById('input-country').value.trim();
+        if(pais) abrirPanelGlobal(pais);
     }
 
     function cerrarPanel() {
-        const container = document.getElementById('app-container');
-        container.classList.remove('split-view');
-        currentStateSelected = null;
-        setTimeout(() => drawMapWithCurrentMode(), 400);
+        document.getElementById('app-container').classList.remove('split-view');
+        if(currentMode !== 'global') {
+            currentStateSelected = null;
+            setTimeout(() => drawMapWithCurrentMode(), 400);
+        }
     }
 
-    async function fetchNewsForState(estadoNombre) {
+    function limpiarControles() {
+        document.getElementById('panel-search').value = '';
+        filtroTiempoActual = 'all';
+        actualizarEstiloTabs();
+    }
+
+    // MOTOR UNIFICADO DE EXTRACCIÓN (Nacional e Internacional)
+    async function fetchNews(termino, modo) {
         const contentDiv = document.getElementById('news-content');
-        contentDiv.innerHTML = `<p style="text-align:center; color:#666; margin-top: 50px;">Buscando información para ${estadoNombre}...</p>`;
+        contentDiv.innerHTML = `<p style="text-align:center; color:#666; margin-top: 50px;">Buscando información de radar para ${termino}...</p>`;
 
         let searchTerms = "";
-        if (currentMode === 'tactico') {
-            searchTerms = estadoNombre + " bloqueos OR trafico OR aduana";
-        } else {
-            searchTerms = estadoNombre + " construccion OR inversion OR aduana";
+        let idiomaParam = "&hl=es-419&gl=MX&ceid=MX:es-419"; // Español por defecto
+
+        if (modo === 'tactico') {
+            searchTerms = termino + " bloqueos OR trafico OR aduana";
+        } else if (modo === 'estrategico') {
+            searchTerms = termino + " construccion OR inversion OR aduana";
+        } else if (modo === 'global') {
+            // Ecuación invisible en inglés cruzando el país con México
+            searchTerms = `"${termino}" (supply chain OR logistics OR tariffs OR shortage OR ports) Mexico`;
+            // Cambiamos el parámetro de Google News para buscar inteligencia corporativa en inglés
+            idiomaParam = "&hl=en-US&gl=US&ceid=US:en";
         }
         
         const cacheBuster = new Date().getTime();
-        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=es-419&gl=MX&ceid=MX:es-419&_t=${cacheBuster}`;
+        const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}${idiomaParam}&_t=${cacheBuster}`;
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 
         try {
@@ -337,68 +353,56 @@
             const dataResponse = await res.json();
 
             if (dataResponse.status === "ok" && dataResponse.items.length > 0) {
-                // Almacenamos el resultado crudo en el caché para la manipulación en pantalla
                 cacheNoticiasActuales = dataResponse.items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
                 renderizarNoticiasFiltradas();
             } else {
                 cacheNoticiasActuales = [];
                 contentDiv.innerHTML = `
                     <div style="text-align:center; padding: 20px; margin-top: 40px;">
-                        <p style="font-size: 40px; margin: 0;">${currentMode === 'tactico' ? '✅' : '📊'}</p>
-                        <p style="color:#7f8c8d;">No se encontraron reportes recientes de este tipo para ${estadoNombre}.</p>
+                        <p style="font-size: 40px; margin: 0;">${modo === 'tactico' ? '✅' : '📊'}</p>
+                        <p style="color:#7f8c8d;">No se encontraron reportes recientes vinculados con este criterio.</p>
                     </div>`;
             }
         } catch (err) {
-            console.error("Error en la extracción de noticias:", err);
-            contentDiv.innerHTML = `<p style='color:#e74c3c; text-align:center; margin-top: 50px;'>No se pudo conectar al servidor de noticias.</p>`;
+            contentDiv.innerHTML = `<p style='color:#e74c3c; text-align:center; margin-top: 50px;'>Error al conectar con la red global.</p>`;
         }
     }
-     // NUEVO MOTOR DE FILTRADO LOCAL (Con ortografía 100% flexible)
+
+    // MOTOR DE FILTRADO LOCAL
     function renderizarNoticiasFiltradas() {
         const contentDiv = document.getElementById('news-content');
         
-        // HERRAMIENTA DE FLEXIBILIDAD ORTOGRÁFICA: Quita mayúsculas y acentos
-        const normalizarTexto = (texto) => {
-            return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        };
-
+        const normalizarTexto = (texto) => texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const textoBusqueda = normalizarTexto(document.getElementById('panel-search').value);
         
-        let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
-        let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
-        let tagHtml = currentMode === 'tactico' ? `<span class="tag">Logística</span>` : `<span class="tag">Desarrollo</span>`;
+        let cardClass = currentMode === 'tactico' ? 'card-tactico' : (currentMode === 'estrategico' ? 'card-estrategico' : 'card-global');
+        let linkColor = currentMode === 'tactico' ? '#e74c3c' : (currentMode === 'estrategico' ? '#2980b9' : '#16a085');
+        let tagHtml = currentMode === 'tactico' ? `<span class="tag">Logística Local</span>` : 
+                     (currentMode === 'estrategico' ? `<span class="tag">Desarrollo Mx</span>` : 
+                     `<span class="tag">Global Supply</span><span class="tag">Macro Risk</span>`);
 
         const ahora = new Date();
 
-        // Aplicar filtros matemáticos sobre el arreglo en memoria
         let notasFiltradas = cacheNoticiasActuales.filter(item => {
             const fechaNota = new Date(item.pubDate);
             const diferenciaHoras = (ahora - fechaNota) / (1000 * 60 * 60);
             
-            // Filtro de tiempo
-            if (filtroTiempoActual !== 'all' && diferenciaHoras > filtroTiempoActual) {
-                return false;
-            }
+            if (filtroTiempoActual !== 'all' && diferenciaHoras > filtroTiempoActual) return false;
             
-            // Filtro de texto (Ortografía flexible)
             if (textoBusqueda) {
                 const tituloNormalizado = normalizarTexto(item.title);
-                if (!tituloNormalizado.includes(textoBusqueda)) {
-                    return false;
-                }
+                if (!tituloNormalizado.includes(textoBusqueda)) return false;
             }
-            
             return true;
         });
 
         if (notasFiltradas.length > 0) {
-            contentDiv.innerHTML = notasFiltradas.map((item, index) => {
+            contentDiv.innerHTML = notasFiltradas.map((item) => {
                 const dateObj = new Date(item.pubDate);
                 const dateStr = !isNaN(dateObj) ? dateObj.toLocaleString('es-MX', {
                     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                 }) : 'Reciente';
 
-                // Escapar comillas para evitar errores en el string de JavaScript al compartir
                 const tituloEscapado = item.title.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
                 return `
@@ -420,10 +424,7 @@
         }
     }
 
-    // Funciones activadas por los botones de la UI
-    function filtrarPantalla() {
-        renderizarNoticiasFiltradas();
-    }
+    function filtrarPantalla() { renderizarNoticiasFiltradas(); }
 
     function cambiarFiltroTiempo(horas) {
         filtroTiempoActual = horas;
@@ -441,22 +442,19 @@
         if (filtroTiempoActual === 48) document.getElementById('time-48').classList.add('active');
     }
 
-    // FUNCIÓN DE EXPORTACIÓN AUTOMATIZADA
-    function compartirAlerta(modo, estado, titulo, link) {
-        const emoji = modo === 'TACTICO' ? '⚠️' : '🏗️';
-        const encabezado = modo === 'TACTICO' ? 'ALERTA LOGÍSTICA' : 'REPORTE DE DEMANDA';
+    function compartirAlerta(modo, locacion, titulo, link) {
+        const emoji = modo === 'TACTICO' ? '⚠️' : (modo === 'ESTRATEGICO' ? '🏗️' : '🌐');
+        const encabezado = modo === 'TACTICO' ? 'ALERTA LOGÍSTICA' : (modo === 'ESTRATEGICO' ? 'REPORTE DEMANDA' : 'ALERTA GLOBAL S&OP');
         
-        const textoFinal = `${emoji} *[${encabezado} - ${estado.toUpperCase()}]*\n\n${titulo}\n\n🔗 Ver reporte completo: ${link}`;
+        const textoFinal = `${emoji} *[${encabezado} - ${locacion.toUpperCase()}]*\n\n${titulo}\n\n🔗 Ver reporte completo: ${link}`;
         
         navigator.clipboard.writeText(textoFinal).then(() => {
-            alert(`🚨 Alerta de ${estado} copiada al portapapeles. Ya puedes pegarla en WhatsApp o Teams.`);
-        }).catch(err => {
-            console.error('No se pudo copiar el texto: ', err);
-        });
+            alert(`🚨 Alerta de ${locacion} copiada al portapapeles.`);
+        }).catch(err => console.error('No se pudo copiar el texto: ', err));
     }
 
     window.addEventListener('resize', () => {
-        if(chart && data && options) chart.draw(data, options);
+        if(chart && data && options && currentMode !== 'global') chart.draw(data, options);
     });
 </script>
 

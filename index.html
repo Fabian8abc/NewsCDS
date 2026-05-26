@@ -353,11 +353,16 @@
             contentDiv.innerHTML = `<p style='color:#e74c3c; text-align:center; margin-top: 50px;'>No se pudo conectar al servidor de noticias.</p>`;
         }
     }
-
-    // NUEVO MOTOR DE FILTRADO LOCAL (Filtra por tiempo y texto simultáneamente)
+     // NUEVO MOTOR DE FILTRADO LOCAL (Con ortografía 100% flexible)
     function renderizarNoticiasFiltradas() {
         const contentDiv = document.getElementById('news-content');
-        const textoBusqueda = document.getElementById('panel-search').value.toLowerCase();
+        
+        // HERRAMIENTA DE FLEXIBILIDAD ORTOGRÁFICA: Quita mayúsculas y acentos
+        const normalizarTexto = (texto) => {
+            return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        };
+
+        const textoBusqueda = normalizarTexto(document.getElementById('panel-search').value);
         
         let cardClass = currentMode === 'tactico' ? 'card-tactico' : 'card-estrategico';
         let linkColor = currentMode === 'tactico' ? '#e74c3c' : '#2980b9';
@@ -375,9 +380,12 @@
                 return false;
             }
             
-            // Filtro de texto
-            if (textoBusqueda && !item.title.toLowerCase().includes(textoBusqueda)) {
-                return false;
+            // Filtro de texto (Ortografía flexible)
+            if (textoBusqueda) {
+                const tituloNormalizado = normalizarTexto(item.title);
+                if (!tituloNormalizado.includes(textoBusqueda)) {
+                    return false;
+                }
             }
             
             return true;
